@@ -224,6 +224,23 @@ router.post(
         return;
       }
 
+      // Post-payout guard: if the member was already paid out, block
+      // contributions for cycles at or before their payout cycle — the debt
+      // for those missed cycles was already deducted from their payout.
+      // Contributions for later cycles (where the member still owes) are fine.
+      const disbursement = await Transaction.findOne({
+        pod: podId,
+        user: userId,
+        type: "disbursement",
+        status: "success",
+      });
+      if (disbursement && targetCycle <= (disbursement.cycleNumber ?? 0)) {
+        res.status(409).json({
+          error: `Cannot record Cycle ${targetCycle} — this member was paid out in Cycle ${disbursement.cycleNumber}. Missed cycle debts were settled during their payout.`,
+        });
+        return;
+      }
+
       const amount = pod.contributionAmount;
 
       const transaction = await Transaction.create({

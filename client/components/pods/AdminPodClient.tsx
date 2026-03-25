@@ -17,12 +17,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import api, { podsApi, paymentsApi } from "@/lib/api";
 import { ngn } from "@/lib/helpers";
 import WalletBalanceWidget from "@/components/pods/WalletBalanceWidget";
-import PodPayoutQueue, {
-  TrustScoreData,
-} from "@/components/pods/PodPayoutQueue";
+import PodPayoutQueue from "@/components/pods/PodPayoutQueue";
 import { useAuthContext } from "@/contexts/AuthContext";
 import TaxShieldBanner from "./TaxShieldBanner";
 import { frequencyLabel } from "@/lib/pod-constants";
+import ContributionMatrix from "./ContributionMatrix";
 
 interface Member {
   _id: string;
@@ -104,9 +103,9 @@ function AdminPodClient({ pod: initialPod }: Readonly<{ pod: Pod }>) {
   async function handlePayout() {
     setPayoutLoading(true);
     try {
-      const { data } = await podsApi.payout(pod._id);
-      setPod(data.pod);
-      if (data.pod.walletId) invalidateWallet();
+      await podsApi.payout(pod._id);
+      await refreshPod();
+      invalidateWallet();
       toast.success("Payout triggered successfully.");
     } catch (e) {
       toast.error(axErrMsg(e));
@@ -115,15 +114,18 @@ function AdminPodClient({ pod: initialPod }: Readonly<{ pod: Pod }>) {
     }
   }
 
+  /** Re-fetch the full pod detail so computed fields like
+   *  partialPayoutMemberIds and nextRecipientMissedCycles are included. */
+  async function refreshPod() {
+    const { data } = await api.get<Pod>(`/api/pods/${pod._id}`);
+    setPod(data);
+  }
+
   async function handleEvaluate() {
     setEvalLoading(true);
     try {
-      const { data } = await podsApi.evaluate(pod._id);
-      setPod(data.pod ?? data);
-      const scoreMap: Record<string, TrustScoreData> = {};
-      for (const ts of data.trustScores ?? []) {
-        scoreMap[ts.userId] = ts;
-      }
+      await podsApi.evaluate(pod._id);
+      await refreshPod();
       setTrustRefreshKey((k) => k + 1);
       toast.success("AI evaluation complete — queue updated.");
     } catch (e: unknown) {
@@ -145,8 +147,8 @@ function AdminPodClient({ pod: initialPod }: Readonly<{ pod: Pod }>) {
   async function handleReset() {
     setResetLoading(true);
     try {
-      const { data } = await podsApi.reset(pod._id);
-      setPod(data.pod);
+      await podsApi.reset(pod._id);
+      await refreshPod();
       setTrustRefreshKey((k) => k + 1);
       toast.success("Pod reset — new rotation started.");
     } catch (e) {
@@ -184,6 +186,12 @@ function AdminPodClient({ pod: initialPod }: Readonly<{ pod: Pod }>) {
       if (data.walletId) invalidateWallet();
       setManualForm({ userId: "", cycleNumber: String(pod.currentCycle) });
       toast.success("Manual payment recorded.");
+
+      // Auto-trigger AI evaluation so the queue reflects the new payment.
+      // Silent if rate-limited or pod is completed.
+      if (evalCoolDown === 0 && data.status !== "completed") {
+        handleEvaluate();
+      }
     } catch (e) {
       toast.error(axErrMsg(e));
     } finally {
@@ -293,6 +301,9 @@ function AdminPodClient({ pod: initialPod }: Readonly<{ pod: Pod }>) {
           nextRecipientMissedCycles={pod.nextRecipientMissedCycles}
           refreshKey={trustRefreshKey}
         />
+
+        {/* Contribution Matrix — member × cycle payment status */}
+        <ContributionMatrix podId={pod._id} />
 
         {/* Admin Actions */}
         <div className="bg-brand-card border border-brand-border rounded-2xl p-6 flex flex-col gap-3">

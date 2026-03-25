@@ -184,6 +184,7 @@ export async function triggerPayout(podId: string): Promise<IPod> {
       missedCycles: missedCycleNumbers,
       status: "success",
       type: "disbursement",
+      cycleNumber: freshPod.currentCycle,
       interswitchRef: reference,
     });
   } catch (err) {
