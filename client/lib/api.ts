@@ -120,8 +120,12 @@ export const paymentsApi = {
     api.post("/api/payments/join", data),
   contribute: (data: { podId: string; cycles?: number }) =>
     api.post("/api/payments/contribute", data),
-  manual: (data: { podId: string; userId: string; cycleNumber: number }) =>
-    api.post("/api/payments/manual", data),
+  manual: (data: {
+    podId: string;
+    userId: string;
+    cycleNumber: number;
+    timestamp?: string;
+  }) => api.post("/api/payments/manual", data),
 };
 
 // Trust

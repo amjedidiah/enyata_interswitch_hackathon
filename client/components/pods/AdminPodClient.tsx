@@ -83,6 +83,7 @@ function AdminPodClient({ pod: initialPod }: Readonly<{ pod: Pod }>) {
   const [manualForm, setManualForm] = useState({
     userId: "",
     cycleNumber: String(initialPod.currentCycle),
+    timestamp: "",
   });
   const [manualLoading, setManualLoading] = useState(false);
   const evalButtonText = useMemo(() => {
@@ -195,11 +196,18 @@ function AdminPodClient({ pod: initialPod }: Readonly<{ pod: Pod }>) {
         podId: pod._id,
         userId: manualForm.userId,
         cycleNumber: Number(manualForm.cycleNumber),
+        timestamp: manualForm.timestamp
+          ? new Date(manualForm.timestamp).toISOString()
+          : undefined,
       });
       const { data } = await api.get<Pod>(`/api/pods/${pod._id}`);
       setPod(normalizePod(data));
       if (data.walletId) invalidateWallet();
-      setManualForm({ userId: "", cycleNumber: String(pod.currentCycle) });
+      setManualForm({
+        userId: "",
+        cycleNumber: String(pod.currentCycle),
+        timestamp: "",
+      });
       setMatrixRefreshKey((k) => k + 1);
       toast.success("Manual payment recorded.");
 
@@ -414,6 +422,27 @@ function AdminPodClient({ pod: initialPod }: Readonly<{ pod: Pod }>) {
                   ),
                 )}
               </select>
+            </div>
+            <div>
+              <label
+                className="text-sm font-medium text-brand-text block mb-1"
+                htmlFor="timestamp"
+              >
+                Contribution date (optional)
+              </label>
+              <input
+                id="timestamp"
+                type="datetime-local"
+                value={manualForm.timestamp}
+                onChange={(e) =>
+                  setManualForm({ ...manualForm, timestamp: e.target.value })
+                }
+                className="w-full border border-brand-border rounded-xl px-4 py-2.5 text-sm bg-brand-card focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
+              />
+              <p className="mt-1 text-[11px] text-brand-muted">
+                Leave empty to use the current time, or backdate to simulate
+                on-time vs late payments for demos.
+              </p>
             </div>
             <button
               type="submit"

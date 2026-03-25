@@ -2,7 +2,7 @@ import { Router, Response } from "express";
 import consola from "consola";
 import { authenticate, AuthRequest } from "../middleware/auth";
 import Pod from "../models/Pod";
-import Transaction from "../models/Transaction";
+import Transaction, { ITransaction } from "../models/Transaction";
 import { creditWallet } from "../services/wallet";
 import { recordContribution } from "../services/contributionService";
 
@@ -50,9 +50,7 @@ router.post(
       }
 
       const userId = req.user!.id;
-      const alreadyMember = pod.members.some(
-        (m) => m.toString() === userId,
-      );
+      const alreadyMember = pod.members.some((m) => m.toString() === userId);
 
       if (!alreadyMember && pod.members.length >= pod.maxMembers) {
         res.status(400).json({ error: "Pod is full" });
@@ -181,7 +179,12 @@ router.post(
   "/manual",
   authenticate,
   async (req: AuthRequest, res: Response): Promise<void> => {
-    const { podId, userId, cycleNumber } = req.body;
+    const { podId, userId, cycleNumber, timestamp } = req.body as {
+      podId?: string;
+      userId?: string;
+      cycleNumber?: number;
+      timestamp?: string;
+    };
 
     if (!podId || !userId) {
       res.status(400).json({ error: "podId and userId are required" });
@@ -244,14 +247,22 @@ router.post(
 
       const amount = pod.contributionAmount;
 
-      const transaction = await Transaction.create({
+      const txDoc: Parameters<typeof Transaction.create>[0] = {
         pod: podId,
         user: userId,
         amount,
         status: "manual",
         type: "contribution",
         cycleNumber: targetCycle,
-      });
+      };
+
+      if (timestamp) {
+        const parsed = new Date(timestamp);
+        if (!Number.isNaN(parsed.getTime()))
+          (txDoc as ITransaction).timestamp = parsed;
+      }
+
+      const transaction = await Transaction.create(txDoc);
 
       await creditWallet(podId, amount);
 

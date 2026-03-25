@@ -8,7 +8,7 @@ import TrustScore from "../models/TrustScore";
 import { authenticate, AuthRequest } from "../middleware/auth";
 import { createWallet, getWalletBalance } from "../services/interswitch";
 import { triggerPayout } from "../services/payoutService";
-import { evaluateAndReorderQueue } from "../services/queueService";
+import { evaluateAndReorderQueue, cycleDueDate } from "../services/queueService";
 
 const router = Router();
 
@@ -774,6 +774,26 @@ router.get(
         if (incoming > existing) lookup[key] = tx.status;
       }
 
+      // For successful/manual contributions, classify payment timing as
+      // on-time vs late so the matrix can surface this distinction.
+      const timingLookup: Record<string, "on_time" | "late"> = {};
+      for (const tx of transactions) {
+        if (
+          tx.cycleNumber == null ||
+          (tx.status !== "success" && tx.status !== "manual")
+        ) {
+          continue;
+        }
+        const userIdStr = tx.user.toString();
+        const cycle = tx.cycleNumber;
+        const key = `${userIdStr}:${cycle}`;
+        if (lookup[key] !== "success" && lookup[key] !== "manual") continue;
+        const due = cycleDueDate(pod.frequency, pod.createdAt, cycle);
+        const paidAt = tx.timestamp ?? (tx as { createdAt?: Date }).createdAt;
+        if (!paidAt) continue;
+        timingLookup[key] = paidAt > due ? "late" : "on_time";
+      }
+
       const totalCycles = pod.maxMembers;
       const members = pod.members.map((m) => {
         const userId = (m._id as { toString(): string }).toString();
@@ -790,7 +810,8 @@ router.get(
           } else {
             status = "upcoming";
           }
-          return { cycle, status };
+          const timing = timingLookup[`${userId}:${cycle}`] ?? null;
+          return { cycle, status, timing };
         });
         const payoutStatus = payoutStatusMap[userId] ?? null;
         return { userId, name: m.name, cycles, payoutStatus };

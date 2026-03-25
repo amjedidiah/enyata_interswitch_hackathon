@@ -124,6 +124,7 @@ function PodPayoutQueue({
                     email={member.email}
                     score={ts?.score}
                     reasoning={ts?.reasoning}
+                    riskFlag={ts?.riskFlag ?? false}
                     movedByAI={ts?.movedByAI ?? false}
                     isNext={i === 0}
                     isPartialPayout={

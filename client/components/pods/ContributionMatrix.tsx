@@ -14,11 +14,12 @@ import { podsApi } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 type CycleStatus = "success" | "failed" | "pending" | "upcoming";
+type CycleTiming = "on_time" | "late" | null;
 
 interface MemberRow {
   userId: string;
   name: string;
-  cycles: { cycle: number; status: CycleStatus }[];
+  cycles: { cycle: number; status: CycleStatus; timing?: CycleTiming }[];
 }
 
 interface MatrixData {
@@ -30,13 +31,18 @@ interface MatrixData {
 function StatusCell({
   status,
   isCurrent,
-}: Readonly<{ status: CycleStatus; isCurrent: boolean }>) {
+  timing,
+}: Readonly<{ status: CycleStatus; isCurrent: boolean; timing?: CycleTiming }>) {
   if (status === "success") {
+    const isLate = timing === "late";
     return (
       <CheckCircle2
         size={16}
-        className="text-brand-success mx-auto"
-        aria-label="Paid"
+        className={cn(
+          "mx-auto",
+          isLate ? "text-brand-warning" : "text-brand-success",
+        )}
+        aria-label={isLate ? "Paid late" : "Paid on time"}
       />
     );
   }
@@ -168,9 +174,12 @@ function ContributionMatrix({
           <Grid3x3 size={16} />
           Contribution Matrix
         </h2>
-        <div className="flex items-center gap-3 text-xs text-brand-muted">
+        <div className="flex flex-wrap items-center gap-3 text-xs text-brand-muted">
           <span className="flex items-center gap-1">
-            <CheckCircle2 size={11} className="text-brand-success" /> Paid
+            <CheckCircle2 size={11} className="text-brand-success" /> On-time
+          </span>
+          <span className="flex items-center gap-1">
+            <CheckCircle2 size={11} className="text-brand-warning" /> Late
           </span>
           <span className="flex items-center gap-1">
             <XCircle size={11} className="text-brand-danger" /> Missed
@@ -215,11 +224,12 @@ function ContributionMatrix({
                 <td className="py-2.5 pr-4 text-xs font-medium text-brand-text truncate max-w-[110px]">
                   {member.name.split(" ")[0]}
                 </td>
-                {member.cycles.map(({ cycle, status }) => (
+                {member.cycles.map(({ cycle, status, timing }) => (
                   <td key={cycle} className="py-2.5 px-2 text-center">
                     <StatusCell
                       status={status}
                       isCurrent={cycle === data.currentCycle}
+                      timing={timing ?? null}
                     />
                   </td>
                 ))}

@@ -8,6 +8,7 @@ interface TrustScoreCardProps {
   email?: string;
   score?: number;
   reasoning?: string;
+  riskFlag?: boolean;
   movedByAI?: boolean;
   isNext?: boolean;
   isPartialPayout?: boolean;
@@ -61,10 +62,24 @@ function TrustScoreCard({
   email,
   score,
   reasoning,
+  riskFlag = false,
   movedByAI = false,
   isNext = false,
   isPartialPayout = false,
 }: Readonly<TrustScoreCardProps>) {
+  let label: string | null = null;
+  if (typeof score === "number") {
+    if (riskFlag || score < 50) {
+      label = "At risk";
+    } else if (score >= 80) {
+      label = "Prompt payer";
+    } else if (score >= 60) {
+      label = "Generally reliable";
+    } else {
+      label = "Mixed record";
+    }
+  }
+
   return (
     <div className="flex flex-col gap-2">
       {/* Main row */}
@@ -95,11 +110,14 @@ function TrustScoreCard({
           </div>
         )}
 
-        {/* Name + email */}
+        {/* Name + email + qualitative label */}
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-brand-text">{name}</p>
           {email && (
             <p className="text-xs text-brand-muted truncate">{email}</p>
+          )}
+          {label && (
+            <p className="text-[11px] text-brand-muted mt-0.5">{label}</p>
           )}
         </div>
 
