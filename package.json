@@ -1,0 +1,10 @@
+{
+  "name": "ajo-flow",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev:server": "cd server && bun run dev",
+    "dev:client": "cd client && bun run dev",
+    "install:all": "bun install && cd server && bun install && cd ../client && bun install"
+  }
+}

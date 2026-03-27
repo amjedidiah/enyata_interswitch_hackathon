@@ -1,0 +1,211 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f7f5f2;
+  --foreground: #1a1a1a;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-brand-primary: #1b2a4a;
+  --color-brand-primary-light: #2d4a7a;
+  --color-brand-accent: #c9922a;
+  --color-brand-accent-light: #e6b347;
+  --color-brand-accent-lighter: #f0d080;
+  --color-brand-surface: #f7f5f2;
+  --color-brand-text: #1a1a1a;
+  --color-brand-muted: #6b7280;
+  --color-brand-success: #16a34a;
+  --color-brand-danger: #dc2626;
+  --color-brand-warning: #d97706;
+  --color-brand-card: #ffffff;
+  --color-brand-border: #e5e7eb;
+  --color-brand-overlay: rgb(0 0 0 / 0.5);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+button:enabled {
+  @apply cursor-pointer;
+}
+
+/* ─── Keyframes ─── */
+@keyframes shimmer {
+  0% {
+    background-position: 200% center;
+  }
+  100% {
+    background-position: -200% center;
+  }
+}
+
+@keyframes float-y {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(0.97);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+}
+
+@keyframes gradient-flow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes slide-shine {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* ─── Reusable utilities ─── */
+.text-shimmer {
+  background-image: linear-gradient(
+    90deg,
+    var(--color-brand-accent) 0%,
+    var(--color-brand-accent-lighter) 40%,
+    var(--color-brand-accent) 70%,
+    var(--color-brand-accent-light) 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shimmer 3s linear infinite;
+}
+
+/* CTA primary button */
+.hero-cta-primary {
+  background: linear-gradient(
+    135deg,
+    var(--color-brand-accent) 0%,
+    var(--color-brand-accent-light) 100%
+  );
+  box-shadow: 0 4px 20px
+    color-mix(in srgb, var(--color-brand-accent) 40%, transparent);
+  transition:
+    box-shadow 0.25s ease,
+    transform 0.15s ease;
+}
+.hero-cta-primary:hover {
+  box-shadow: 0 6px 35px
+    color-mix(in srgb, var(--color-brand-accent) 60%, transparent);
+  transform: translateY(-1px);
+}
+.hero-cta-shine {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 25%,
+    color-mix(in srgb, var(--color-brand-card) 28%, transparent) 50%,
+    transparent 75%
+  );
+  transform: translateX(-100%);
+  transition: transform 0.45s ease;
+  pointer-events: none;
+}
+.hero-cta-primary:hover .hero-cta-shine {
+  transform: translateX(100%);
+}
+
+/* Feature cards */
+.feature-card {
+  transition:
+    box-shadow 0.3s ease,
+    border-color 0.3s ease,
+    transform 0.25s ease;
+}
+.feature-card:hover {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-brand-accent) 20%, transparent),
+    0 12px 40px color-mix(in srgb, var(--color-brand-accent) 10%, transparent);
+  transform: translateY(-3px);
+}
+.feature-card-accent:hover {
+  box-shadow: 0 12px 40px
+    color-mix(in srgb, var(--color-brand-accent) 30%, transparent);
+  transform: translateY(-3px);
+}
+
+/* Step cards */
+.step-card {
+  transition:
+    box-shadow 0.3s ease,
+    transform 0.25s ease,
+    border-color 0.3s ease;
+}
+.step-card:hover {
+  box-shadow: 0 12px 35px
+    color-mix(in srgb, var(--color-brand-primary) 12%, transparent);
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--color-brand-accent) 30%, transparent);
+}
+
+/* Testimonial cards */
+.testimonial-card {
+  transition:
+    box-shadow 0.3s ease,
+    transform 0.25s ease;
+}
+.testimonial-card:hover {
+  box-shadow: 0 16px 45px
+    color-mix(in srgb, var(--color-brand-primary) 13%, transparent);
+  transform: translateY(-4px);
+}
+
+/* Stat bar items */
+.stat-value {
+  background-image: linear-gradient(
+    135deg,
+    var(--color-brand-primary) 0%,
+    var(--color-brand-primary-light) 100%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* CTA section gradient */
+.cta-bg {
+  background: linear-gradient(
+    135deg,
+    var(--color-brand-surface) 0%,
+    color-mix(in srgb, var(--color-brand-accent) 5%, var(--color-brand-card))
+      50%,
+    var(--color-brand-surface) 100%
+  );
+  background-size: 200% 200%;
+  animation: gradient-flow 8s ease infinite;
+}
