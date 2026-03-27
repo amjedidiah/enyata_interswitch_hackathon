@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**AjoFlow** is an AI-powered digital ROSCA (Rotating Savings and Credit Association) platform for the Interswitch x Enyata Hackathon (March 9–13, 2026). It digitizes traditional Nigerian "Ajoo/Esusu" savings circles with trustless wallet and AI-based trust scoring.
+**AjoFlow** is an AI-powered digital ROSCA (Rotating Savings and Credit Association) platform for the Interswitch x Enyata Hackathon (March 23–27, 2026). It digitizes traditional Nigerian "Ajoo/Esusu" savings circles with trustless wallet and AI-based trust scoring.
 
 ## Commands
 
@@ -65,6 +65,7 @@ curl -X POST http://localhost:4000/api/cron/run-deductions \
 | `trustAgent.ts` | DeepSeek V3 AI via LangChain — scores user reliability 0–100 with structured Zod output |
 | `queueService.ts` | Scores all pod members, reorders queue (risky members with score <50 move to end) |
 | `payoutService.ts` | Validates wallet balance, triggers Interswitch disbursement, updates pod state |
+| `contributionService.ts` | Records contribution cycles — cap validation, smart cycle assignment (skips paid cycles), duplicate guard, transaction creation, wallet credit |
 | `wallet.ts` | Credits pod wallet via virtual account callback + increments `contributionTotal` ledger |
 
 **AI Trust Agent** uses `@langchain/deepseek` (not OpenAI GPT-4 as originally planned). Input: per-user payment stats. Output: `{ score: number, reasoning: string, riskFlag: boolean }`.
@@ -84,6 +85,7 @@ Three route groups. `<Navbar />` is in root `layout.tsx` (global); `(auth)/layou
   - `/my-pods` — User's pods list (`GET /api/pods?member=true`); "Manage →" link for owned pods
   - `/my-pods/[id]` — Member pod detail (same content as public pod detail, but auth-gated)
   - `/my-pods/[id]/manage` — Admin controls: trigger payout, run AI evaluation (15s polling)
+  - `/settings` — Bank details form (bank code + account number) for payout disbursement
 
 `(protected)/layout.tsx` uses `useAuthContext()` and waits for `isInitialized` before redirecting to `/login` if no token is present. This eliminates the flash caused by the previous `localStorage` approach.
 
@@ -141,6 +143,6 @@ Days 2–4 evaluation focus: Interswitch API integration depth and AI orchestrat
 
 ## Submission
 
-- **Deadline**: March 13, 2026
+- **Hackathon ended**: March 27, 2026
 - Public GitHub repo, live MVP (Vercel + Render), test credentials for judges
 - Sectors: Payments (P), Social Services (S), Emerging Tech (AI)

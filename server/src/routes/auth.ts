@@ -79,10 +79,10 @@ router.post("/register", async (req: Request, res: Response): Promise<void> => {
     const emailValidation = await validateEmail({
       email: trimmedEmail,
       validateRegex: true,
-      validateMx: isProduction,
+      validateMx: false,
       validateTypo: false,
-      validateDisposable: isProduction,
-      validateSMTP: isProduction,
+      validateDisposable: false,
+      validateSMTP: false,
     });
 
     if (!emailValidation.valid) {
