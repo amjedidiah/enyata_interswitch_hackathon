@@ -21,13 +21,23 @@ const TrustScoreSchema = z.object({
 
 export type TrustScoreResult = z.infer<typeof TrustScoreSchema>;
 
+export type CycleOutcome =
+  | "on_time" // paid before due date
+  | "late" // paid after due date
+  | "missed" // no successful payment recorded
+  | "resolved_late" // initially failed, then resolved by manual/retry (counts as late)
+  | "pending"; // current cycle, not yet due
+
+export interface CycleDetail {
+  cycle: number;
+  outcome: CycleOutcome;
+}
+
 export interface UserPaymentData {
   userId: string;
-  onTimePayments: number;
-  latePayments: number;
-  missedPayments: number;
+  /** Per-cycle payment timeline for this pod. */
+  cycleHistory: CycleDetail[];
   completedPods: number;
-  failedCardCharges: number;
   /** 1-indexed position in the current payout queue. 0 = already paid out. */
   queuePosition: number;
   /** Total number of members in the pod. */
@@ -62,27 +72,53 @@ Platform-wide history (across all pods this user has joined):
 - Total pods joined: ${userData.platformHistory.totalPodsJoined}
 - On-time payments (all pods): ${userData.platformHistory.onTimeAcrossAllPods}
 - Late payments (all pods): ${userData.platformHistory.lateAcrossAllPods}
-- Missed payments (all pods): ${userData.platformHistory.missedAcrossAllPods}${userData.platformHistory.avgTrustScore !== null ? `\n- Average trust score across pods: ${userData.platformHistory.avgTrustScore.toFixed(0)}` : ""}
+- Missed payments (all pods): ${userData.platformHistory.missedAcrossAllPods}${userData.platformHistory.avgTrustScore === null ? "" : `\n- Average trust score across pods: ${userData.platformHistory.avgTrustScore.toFixed(0)}`}
 
 Use the platform-wide history as context: a member with a strong track record across multiple pods is more trustworthy than their current pod stats alone might suggest. For new members with no history in this pod, lean on the platform-wide data as a baseline.`
     : "";
 
-  const prompt = `You are an AI Trust Agent for AjoFlow, a digital savings circle (ROSCA) platform.
-Evaluate the payment reliability of a user based on their contribution history and queue context, then return a structured trust score.
+  // Build per-cycle timeline for the prompt
+  const cycleLines = userData.cycleHistory.map((c) => {
+    const labels: Record<CycleOutcome, string> = {
+      on_time: "Paid on time",
+      late: "Paid late",
+      missed: "MISSED — no payment recorded",
+      resolved_late:
+        "Failed card charge → resolved by manual/retry payment (late)",
+      pending: "Current cycle — payment pending",
+    };
+    return `  Cycle ${c.cycle}: ${labels[c.outcome]}`;
+  });
 
-User payment history (this pod):
-- On-time payments: ${userData.onTimePayments}
-- Late payments: ${userData.latePayments}
-- Missed payments: ${userData.missedPayments}
-- Failed card charges: ${userData.failedCardCharges}
-- Completed savings pods: ${userData.completedPods}
+  // Derive summary counts from cycle history for the prompt
+  const onTime = userData.cycleHistory.filter(
+    (c) => c.outcome === "on_time",
+  ).length;
+  const late = userData.cycleHistory.filter(
+    (c) => c.outcome === "late" || c.outcome === "resolved_late",
+  ).length;
+  const missed = userData.cycleHistory.filter(
+    (c) => c.outcome === "missed",
+  ).length;
+
+  const prompt = `You are an AI Trust Agent for AjoFlow, a digital savings circle (ROSCA) platform.
+Evaluate the payment reliability of a user based on their per-cycle contribution history and queue context, then return a structured trust score.
+
+Per-cycle payment history (this pod):
+${cycleLines.join("\n")}
+
+Summary: ${onTime} on-time, ${late} late/resolved, ${missed} missed. Completed pods: ${userData.completedPods}.
 ${platformSection}
 Queue context:
 - ${waitContext}
 
+Key concepts:
+- "resolved_late" means the member initially failed to pay (card declined, etc.) but later made good via a manual or retry payment. This is better than a full miss but worse than paying on time — treat it similarly to a late payment.
+- "missed" means no successful payment was ever recorded for that cycle. This is the most serious negative signal.
+
 Scoring guidelines:
 - 80-100: Excellent — consistent on-time payments, no failures
-- 60-79: Good — mostly reliable with minor issues
+- 60-79: Good — mostly reliable with minor issues (e.g. one late or resolved payment)
 - 40-59: Fair — some missed or late payments, moderate risk
 - 0-39: Poor — repeated failures, high risk
 

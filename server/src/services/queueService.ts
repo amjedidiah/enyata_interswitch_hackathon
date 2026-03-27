@@ -3,7 +3,7 @@ import Pod, { IPod } from "../models/Pod";
 import User from "../models/User";
 import Transaction from "../models/Transaction";
 import TrustScore from "../models/TrustScore";
-import { scoreTrust } from "./trustAgent";
+import { scoreTrust, CycleDetail, CycleOutcome } from "./trustAgent";
 
 export interface MemberEvaluation {
   userId: string;
@@ -84,36 +84,47 @@ export async function evaluateAndReorderQueue(
       const user = await User.findById(memberId);
       if (!user) continue;
 
-      // Derive payment stats from the Transaction collection for this pod
+      // Build per-cycle payment timeline for this member in this pod.
+      // For each cycle, determine the effective outcome by looking at all
+      // transactions. A successful/manual payment overrides a prior failed
+      // charge for the same cycle.
       const contributions = await Transaction.find({
         pod: pod._id,
         user: memberId,
         type: "contribution",
       });
 
-      const successful = contributions.filter(
-        (t) => t.status === "success" || t.status === "manual",
-      );
-      const failedCardCharges = contributions.filter(
-        (t) => t.status === "failed",
-      ).length;
+      const cycleHistory: CycleDetail[] = [];
+      for (let cycle = 1; cycle <= pod.currentCycle; cycle++) {
+        const cycleTxs = contributions.filter((t) => t.cycleNumber === cycle);
+        const hasSuccess = cycleTxs.some(
+          (t) => t.status === "success" || t.status === "manual",
+        );
+        const hasFailed = cycleTxs.some((t) => t.status === "failed");
 
-      // Classify successful contributions as on-time or late by comparing
-      // the transaction timestamp to the cycle's due date.
-      let onTimePayments = 0;
-      let latePayments = 0;
-      for (const tx of successful) {
-        if (tx.cycleNumber == null) {
-          onTimePayments++;
-          continue;
-        }
-        const due = cycleDueDate(pod.frequency, pod.createdAt, tx.cycleNumber);
-        const paidAt = tx.timestamp ?? (tx as { createdAt?: Date }).createdAt;
-        if (paidAt && paidAt > due) {
-          latePayments++;
+        let outcome: CycleOutcome;
+        if (hasSuccess) {
+          if (hasFailed) {
+            // Initially failed but later resolved — treat as late
+            outcome = "resolved_late";
+          } else {
+            // Check if the successful payment was on time or late
+            const successTx = cycleTxs.find(
+              (t) => t.status === "success" || t.status === "manual",
+            )!;
+            const due = cycleDueDate(pod.frequency, pod.createdAt, cycle);
+            const paidAt =
+              successTx.timestamp ??
+              (successTx as { createdAt?: Date }).createdAt;
+            outcome = paidAt && paidAt > due ? "late" : "on_time";
+          }
+        } else if (cycle === pod.currentCycle) {
+          // Current cycle with no payment yet — pending, not missed
+          outcome = hasFailed ? "missed" : "pending";
         } else {
-          onTimePayments++;
+          outcome = "missed";
         }
+        cycleHistory.push({ cycle, outcome });
       }
 
       // Count pods where this user has already received a payout (completed pod history)
@@ -197,11 +208,8 @@ export async function evaluateAndReorderQueue(
 
       const result = await scoreTrust({
         userId: memberId.toString(),
-        onTimePayments,
-        latePayments,
-        missedPayments: failedCardCharges,
+        cycleHistory,
         completedPods,
-        failedCardCharges,
         queuePosition,
         totalMembers: pod.members.length,
         platformHistory,
@@ -234,26 +242,15 @@ export async function evaluateAndReorderQueue(
     }
   }
 
+  const scoreMap = new Map(
+    scored.map((s) => [s.userId.toString(), s.score]),
+  );
   const riskMap = new Map(
     scored.map((s) => [s.userId.toString(), s.riskFlag]),
   );
 
-  // Step 1 — Pin the next recipient (position 0) ONLY if they are not risky.
-  // If the next-in-line member has a riskFlag (score < 50), they are demoted
-  // like everyone else — the pod should not pay out to someone the AI has
-  // flagged as unreliable.
-  const [firstInQueue, ...rest] = pod.payoutQueue;
-  const firstIsRisky = riskMap.get(firstInQueue?.toString() ?? "") ?? false;
-  const pinnedNextRecipient = firstIsRisky ? null : firstInQueue;
-  const reorderCandidates = firstIsRisky ? pod.payoutQueue.slice() : rest;
-
-  // AI sort on remaining members only: safe keep relative order, risky go to end.
-  const safe = reorderCandidates.filter((id) => !riskMap.get(id.toString()));
-  const risky = reorderCandidates.filter((id) => riskMap.get(id.toString()));
-
-  // Step 2 — Deterministic secondary sort within each bucket: members who have paid
-  // the current cycle rank above those who haven't, regardless of AI trust score.
-  const remainingQueue = [...safe, ...risky];
+  // Rank the entire queue by trust score (highest first).
+  // Within tied scores, members who have paid the current cycle rank higher.
   const paidThisCycle = new Set(
     (
       await Transaction.distinct("user", {
@@ -265,18 +262,17 @@ export async function evaluateAndReorderQueue(
     ).map(String),
   );
 
-  const sortByPayment = (arr: Types.ObjectId[]) => [
-    ...arr.filter((id) => paidThisCycle.has(id.toString())),
-    ...arr.filter((id) => !paidThisCycle.has(id.toString())),
-  ];
+  const sorted = [...pod.payoutQueue].sort((a, b) => {
+    const scoreA = scoreMap.get(a.toString()) ?? 0;
+    const scoreB = scoreMap.get(b.toString()) ?? 0;
+    if (scoreA !== scoreB) return scoreB - scoreA; // higher score first
+    // Tie-break: paid current cycle first
+    const paidA = paidThisCycle.has(a.toString()) ? 1 : 0;
+    const paidB = paidThisCycle.has(b.toString()) ? 1 : 0;
+    return paidB - paidA;
+  });
 
-  // Re-partition remaining members (excluding pinned recipient) and sort within buckets.
-  const remainingSafe = remainingQueue.filter((id) => !riskMap.get(id.toString()));
-  const remainingRisky = remainingQueue.filter((id) => riskMap.get(id.toString()));
-
-  // Final order: [pinned recipient if safe] → safe+paid → safe+unpaid → risky+paid → risky+unpaid
-  const sorted = [...sortByPayment(remainingSafe), ...sortByPayment(remainingRisky)];
-  pod.payoutQueue = pinnedNextRecipient ? [pinnedNextRecipient, ...sorted] : sorted;
+  pod.payoutQueue = sorted;
   await pod.save();
   await pod.populate("members", "name email");
   await pod.populate("payoutQueue", "name email");
@@ -289,9 +285,8 @@ export async function evaluateAndReorderQueue(
     const id = s.userId.toString();
     const originalPos = originalOrder.indexOf(id);
     const newPos = newOrder.indexOf(id);
-    // movedByAI is true only if the member was in the queue and shifted to a later position
-    const movedByAI =
-      originalPos !== -1 && s.riskFlag && newPos > originalPos;
+    // movedByAI is true if the member was in the queue and shifted to a later position
+    const movedByAI = originalPos !== -1 && newPos > originalPos;
 
     return {
       userId: id,

@@ -1,5 +1,5 @@
 import { Router, Response } from "express";
-import { scoreTrust } from "../services/trustAgent";
+import { scoreTrust, CycleDetail } from "../services/trustAgent";
 import { authenticate, AuthRequest } from "../middleware/auth";
 
 const router = Router();
@@ -14,7 +14,6 @@ router.post(
       latePayments,
       missedPayments,
       completedPods,
-      failedCardCharges,
       queuePosition,
       totalMembers,
     } = req.body;
@@ -25,7 +24,6 @@ router.post(
       "latePayments",
       "missedPayments",
       "completedPods",
-      "failedCardCharges",
     ].filter((key) => req.body[key] === undefined);
 
     if (missing.length > 0) {
@@ -35,14 +33,21 @@ router.post(
       return;
     }
 
+    // Build a synthetic cycle history from flat counts for testing.
+    const cycleHistory: CycleDetail[] = [];
+    let cycle = 1;
+    for (let i = 0; i < Number(onTimePayments); i++)
+      cycleHistory.push({ cycle: cycle++, outcome: "on_time" });
+    for (let i = 0; i < Number(latePayments); i++)
+      cycleHistory.push({ cycle: cycle++, outcome: "late" });
+    for (let i = 0; i < Number(missedPayments); i++)
+      cycleHistory.push({ cycle: cycle++, outcome: "missed" });
+
     try {
       const result = await scoreTrust({
         userId,
-        onTimePayments: Number(onTimePayments),
-        latePayments: Number(latePayments),
-        missedPayments: Number(missedPayments),
+        cycleHistory,
         completedPods: Number(completedPods),
-        failedCardCharges: Number(failedCardCharges),
         queuePosition: queuePosition === undefined ? 0 : Number(queuePosition),
         totalMembers: totalMembers === undefined ? 0 : Number(totalMembers),
       });

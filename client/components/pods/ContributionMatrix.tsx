@@ -71,7 +71,10 @@ function StatusCell({
   );
 }
 
-function ContributionMatrix({ podId }: Readonly<{ podId: string }>) {
+function ContributionMatrix({
+  podId,
+  refreshKey = 0,
+}: Readonly<{ podId: string; refreshKey?: number }>) {
   const [data, setData] = useState<MatrixData | null>(null);
   const [state, setState] = useState<"loading" | "error" | "hidden" | "ready">(
     "loading",
@@ -89,7 +92,7 @@ function ContributionMatrix({ podId }: Readonly<{ podId: string }>) {
         // 401/403 means not admin — hide silently
         setState(status === 401 || status === 403 ? "hidden" : "error");
       });
-  }, [podId]);
+  }, [podId, refreshKey]);
 
   if (state === "hidden") return null;
 

@@ -62,6 +62,7 @@ function AdminPodClient({ pod: initialPod }: Readonly<{ pod: Pod }>) {
   const invalidateWallet = () =>
     queryClient.invalidateQueries({ queryKey: ["wallet-balance", pod._id] });
   const [trustRefreshKey, setTrustRefreshKey] = useState(0);
+  const [matrixRefreshKey, setMatrixRefreshKey] = useState(0);
   const [payoutLoading, setPayoutLoading] = useState(false);
   const [evalLoading, setEvalLoading] = useState(false);
   const [evalCoolDown, setEvalCoolDown] = useState(0); // seconds remaining
@@ -106,6 +107,7 @@ function AdminPodClient({ pod: initialPod }: Readonly<{ pod: Pod }>) {
       await podsApi.payout(pod._id);
       await refreshPod();
       invalidateWallet();
+      setMatrixRefreshKey((k) => k + 1);
       toast.success("Payout triggered successfully.");
     } catch (e) {
       toast.error(axErrMsg(e));
@@ -150,6 +152,7 @@ function AdminPodClient({ pod: initialPod }: Readonly<{ pod: Pod }>) {
       await podsApi.reset(pod._id);
       await refreshPod();
       setTrustRefreshKey((k) => k + 1);
+      setMatrixRefreshKey((k) => k + 1);
       toast.success("Pod reset — new rotation started.");
     } catch (e) {
       toast.error(axErrMsg(e));
@@ -185,6 +188,7 @@ function AdminPodClient({ pod: initialPod }: Readonly<{ pod: Pod }>) {
       setPod(data);
       if (data.walletId) invalidateWallet();
       setManualForm({ userId: "", cycleNumber: String(pod.currentCycle) });
+      setMatrixRefreshKey((k) => k + 1);
       toast.success("Manual payment recorded.");
 
       // Auto-trigger AI evaluation so the queue reflects the new payment.
@@ -303,7 +307,7 @@ function AdminPodClient({ pod: initialPod }: Readonly<{ pod: Pod }>) {
         />
 
         {/* Contribution Matrix — member × cycle payment status */}
-        <ContributionMatrix podId={pod._id} />
+        <ContributionMatrix podId={pod._id} refreshKey={matrixRefreshKey} />
 
         {/* Admin Actions */}
         <div className="bg-brand-card border border-brand-border rounded-2xl p-6 flex flex-col gap-3">
