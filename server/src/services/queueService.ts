@@ -158,9 +158,15 @@ export async function evaluateAndReorderQueue(
 
         // Classify cross-pod contributions as on-time or late.
         // We need each transaction's pod frequency + createdAt to compute due dates.
-        const crossPodIds = [...new Set(allPodContributions.map((t) => t.pod.toString()))];
-        const crossPods = await Pod.find({ _id: { $in: crossPodIds } }).select("frequency createdAt").lean();
-        const crossPodMap = new Map(crossPods.map((p) => [p._id.toString(), p]));
+        const crossPodIds = [
+          ...new Set(allPodContributions.map((t) => t.pod.toString())),
+        ];
+        const crossPods = await Pod.find({ _id: { $in: crossPodIds } })
+          .select("frequency createdAt")
+          .lean();
+        const crossPodMap = new Map(
+          crossPods.map((p) => [p._id.toString(), p]),
+        );
 
         let crossOnTime = 0;
         let crossLate = 0;
@@ -170,7 +176,11 @@ export async function evaluateAndReorderQueue(
             crossOnTime++;
             continue;
           }
-          const due = cycleDueDate(txPod.frequency, txPod.createdAt, tx.cycleNumber);
+          const due = cycleDueDate(
+            txPod.frequency,
+            txPod.createdAt,
+            tx.cycleNumber,
+          );
           const paidAt = tx.timestamp ?? (tx as { createdAt?: Date }).createdAt;
           if (paidAt && paidAt > due) {
             crossLate++;
@@ -183,7 +193,9 @@ export async function evaluateAndReorderQueue(
         const latestScores = await TrustScore.find({
           user: memberId,
           pod: { $ne: pod._id },
-        }).sort({ evaluatedAt: -1 }).lean();
+        })
+          .sort({ evaluatedAt: -1 })
+          .lean();
 
         // De-duplicate to one score per pod (latest)
         const seenPods = new Set<string>();
@@ -195,9 +207,10 @@ export async function evaluateAndReorderQueue(
             uniqueScores.push(ts.score);
           }
         }
-        const avgTrustScore = uniqueScores.length > 0
-          ? uniqueScores.reduce((a, b) => a + b, 0) / uniqueScores.length
-          : null;
+        const avgTrustScore =
+          uniqueScores.length > 0
+            ? uniqueScores.reduce((a, b) => a + b, 0) / uniqueScores.length
+            : null;
 
         platformHistory = {
           totalPodsJoined,
@@ -266,7 +279,11 @@ export async function evaluateAndReorderQueue(
     // Tie-break: paid current cycle first
     const paidA = paidThisCycle.has(a.toString()) ? 1 : 0;
     const paidB = paidThisCycle.has(b.toString()) ? 1 : 0;
-    return paidB - paidA;
+    if (paidA !== paidB) return paidB - paidA;
+    // Final tie-break: preserve original order for stability
+    return (
+      originalOrder.indexOf(a.toString()) - originalOrder.indexOf(b.toString())
+    );
   });
 
   pod.payoutQueue = sorted;

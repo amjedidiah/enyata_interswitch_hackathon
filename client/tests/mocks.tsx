@@ -3,6 +3,8 @@
  *
  * Import this file in component tests that need router/searchParams/auth.
  */
+// ─── AuthContext test wrapper ────────────────────────────────────────────────
+import { type AuthUser } from "@/contexts/AuthContext";
 
 // ─── Next.js navigation mocks ───────────────────────────────────────────────
 
@@ -11,10 +13,6 @@ export const mockSearchParams = new URLSearchParams();
 
 // These are set up via mock.module in individual test files.
 // Exported here as defaults for reference.
-
-// ─── AuthContext test wrapper ────────────────────────────────────────────────
-
-import { type AuthUser } from "@/contexts/AuthContext";
 
 type MockAuthValue = {
   user: AuthUser | null;

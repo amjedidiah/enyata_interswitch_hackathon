@@ -32,19 +32,17 @@ function PodDetailClient({
   const isFull = pod.members.length >= pod.maxMembers;
   const isMember = pod.members.some((m) => m._id === userId);
   const isAdmin = pod.createdBy === userId;
+  const shouldRedirect =
+    variant === "member" && isInitialized && userId && !isMember && !isAdmin;
 
   // Redirect non-members away from /my-pods/:id to the public view
   useEffect(() => {
-    if (
-      variant === "member" &&
-      isInitialized &&
-      userId &&
-      !isMember &&
-      !isAdmin
-    ) {
+    if (shouldRedirect) {
       router.replace(`/pods/${pod._id}`);
     }
-  }, [variant, isInitialized, userId, isMember, isAdmin, pod._id, router]);
+  }, [shouldRedirect, router, pod._id]);
+
+  if (shouldRedirect) return null;
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-6 flex flex-col gap-5">

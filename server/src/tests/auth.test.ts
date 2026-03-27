@@ -27,7 +27,7 @@ beforeAll(async () => {
   await connectTestDB();
   const app = createApp();
   await new Promise<void>((resolve) => {
-    server = app.listen(0, resolve as unknown as (error?: Error | undefined) => void);
+    server = app.listen(0, () => resolve());
   });
   const addr = server.address() as { port: number };
   baseUrl = `http://localhost:${addr.port}`;
@@ -74,9 +74,12 @@ const validUser = {
   phone: "+2348100000000",
 };
 
-async function registerAndGetToken(): Promise<{ token: string; cookie: string }> {
+async function registerAndGetToken(): Promise<{
+  token: string;
+  cookie: string;
+}> {
   const res = await post("/auth/register", validUser);
-  const data = await res.json() as { token: string };
+  const data = (await res.json()) as { token: string };
   const cookie = res.headers.get("set-cookie") ?? "";
   return { token: data.token, cookie };
 }
@@ -88,7 +91,10 @@ describe("POST /auth/register", () => {
     const res = await post("/auth/register", validUser);
     expect(res.status).toBe(201);
 
-    const data = await res.json() as { token: string; user: { name: string; email: string } };
+    const data = (await res.json()) as {
+      token: string;
+      user: { name: string; email: string };
+    };
     expect(data.token).toBeDefined();
     expect(data.user.email).toBe(validUser.email);
 
@@ -104,31 +110,40 @@ describe("POST /auth/register", () => {
   it("rejects short names", async () => {
     const res = await post("/auth/register", { ...validUser, name: "AB" });
     expect(res.status).toBe(400);
-    const data = await res.json() as { error: string };
+    const data = (await res.json()) as { error: string };
     expect(data.error).toContain("Name too short");
   });
 
   it("rejects weak passwords", async () => {
-    const res = await post("/auth/register", { ...validUser, password: "weak" });
+    const res = await post("/auth/register", {
+      ...validUser,
+      password: "weak",
+    });
     expect(res.status).toBe(400);
-    const data = await res.json() as { error: string };
+    const data = (await res.json()) as { error: string };
     expect(data.error).toContain("Weak password");
   });
 
   it("rejects password without uppercase", async () => {
-    const res = await post("/auth/register", { ...validUser, password: "strong@pass1" });
+    const res = await post("/auth/register", {
+      ...validUser,
+      password: "strong@pass1",
+    });
     expect(res.status).toBe(400);
   });
 
   it("rejects password without special char", async () => {
-    const res = await post("/auth/register", { ...validUser, password: "StrongPass1" });
+    const res = await post("/auth/register", {
+      ...validUser,
+      password: "StrongPass1",
+    });
     expect(res.status).toBe(400);
   });
 
   it("rejects invalid phone numbers", async () => {
     const res = await post("/auth/register", { ...validUser, phone: "123" });
     expect(res.status).toBe(400);
-    const data = await res.json() as { error: string };
+    const data = (await res.json()) as { error: string };
     expect(data.error).toContain("Invalid phone");
   });
 
@@ -150,7 +165,10 @@ describe("POST /auth/login", () => {
     });
     expect(res.status).toBe(200);
 
-    const data = await res.json() as { token: string; user: { email: string } };
+    const data = (await res.json()) as {
+      token: string;
+      user: { email: string };
+    };
     expect(data.token).toBeDefined();
     expect(data.user.email).toBe(validUser.email);
   });
@@ -186,10 +204,12 @@ describe("POST /auth/refresh", () => {
 
     // Extract just the refresh_token cookie value
     const refreshCookie = cookie.split(";")[0]; // "refresh_token=..."
-    const res = await post("/auth/refresh", undefined, { Cookie: refreshCookie });
+    const res = await post("/auth/refresh", undefined, {
+      Cookie: refreshCookie,
+    });
     expect(res.status).toBe(200);
 
-    const data = await res.json() as { token: string };
+    const data = (await res.json()) as { token: string };
     expect(data.token).toBeDefined();
 
     // Should set a new refresh cookie (rotation)
@@ -223,7 +243,7 @@ describe("POST /auth/logout", () => {
     // Verify cookie is actually cleared
     expect(
       cookie.toLowerCase().includes("max-age=0") ||
-      cookie.toLowerCase().includes("expires=thu, 01 jan 1970")
+        cookie.toLowerCase().includes("expires=thu, 01 jan 1970"),
     ).toBe(true);
   });
 });
@@ -236,7 +256,9 @@ describe("GET /auth/me", () => {
     const res = await get("/auth/me", token);
     expect(res.status).toBe(200);
 
-    const data = await res.json() as { user: { email: string; name: string } };
+    const data = (await res.json()) as {
+      user: { email: string; name: string };
+    };
     expect(data.user.email).toBe(validUser.email);
     expect(data.user.name).toBe(validUser.name);
   });
@@ -252,38 +274,56 @@ describe("GET /auth/me", () => {
 describe("PATCH /auth/me", () => {
   it("updates bank details with valid NUBAN", async () => {
     const { token } = await registerAndGetToken();
-    const res = await patch("/auth/me", {
-      bankAccountNumber: "0123456789",
-      bankCode: "057",
-    }, token);
+    const res = await patch(
+      "/auth/me",
+      {
+        bankAccountNumber: "0123456789",
+        bankCode: "057",
+      },
+      token,
+    );
     expect(res.status).toBe(200);
 
-    const data = await res.json() as { user: { bankAccountNumber: string; bankCode: string } };
+    const data = (await res.json()) as {
+      user: { bankAccountNumber: string; bankCode: string };
+    };
     expect(data.user.bankAccountNumber).toBe("0123456789");
     expect(data.user.bankCode).toBe("057");
   });
 
   it("rejects non-10-digit account number", async () => {
     const { token } = await registerAndGetToken();
-    const res = await patch("/auth/me", {
-      bankAccountNumber: "12345",
-      bankCode: "057",
-    }, token);
+    const res = await patch(
+      "/auth/me",
+      {
+        bankAccountNumber: "12345",
+        bankCode: "057",
+      },
+      token,
+    );
     expect(res.status).toBe(400);
   });
 
   it("rejects invalid bank code", async () => {
     const { token } = await registerAndGetToken();
-    const res = await patch("/auth/me", {
-      bankAccountNumber: "0123456789",
-      bankCode: "1",
-    }, token);
+    const res = await patch(
+      "/auth/me",
+      {
+        bankAccountNumber: "0123456789",
+        bankCode: "1",
+      },
+      token,
+    );
     expect(res.status).toBe(400);
   });
 
   it("rejects missing fields", async () => {
     const { token } = await registerAndGetToken();
-    const res = await patch("/auth/me", { bankAccountNumber: "0123456789" }, token);
+    const res = await patch(
+      "/auth/me",
+      { bankAccountNumber: "0123456789" },
+      token,
+    );
     expect(res.status).toBe(400);
   });
 });

@@ -81,17 +81,24 @@ function ContributionMatrix({
   );
 
   useEffect(() => {
+    let cancelled = false;
     podsApi
       .contributionMatrix(podId)
       .then(({ data: d }) => {
+        if (cancelled) return;
         setData(d);
         setState("ready");
       })
       .catch((err: AxiosError) => {
+        if (cancelled) return;
         const status = err.response?.status;
         // 401/403 means not admin — hide silently
         setState(status === 401 || status === 403 ? "hidden" : "error");
       });
+
+    return () => {
+      cancelled = true;
+    };
   }, [podId, refreshKey]);
 
   if (state === "hidden") return null;

@@ -146,6 +146,7 @@ describe("runCycleDeadlineEvaluations", () => {
     const result = await runCycleDeadlineEvaluations();
     expect(result.skipped).toHaveLength(1);
     expect(result.skipped[0]).toContain("queue empty");
+    expect(evaluateCalls).toHaveLength(0);
   });
 
   it("skips completed pods (only finds active ones)", async () => {

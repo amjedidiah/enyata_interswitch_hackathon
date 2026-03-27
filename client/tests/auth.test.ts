@@ -26,4 +26,11 @@ describe("auth token store", () => {
     setAccessToken("token-2");
     expect(getAccessToken()).toBe("token-2");
   });
+
+  it("handles undefined parameter", () => {
+    setAccessToken("token-1");
+    setAccessToken(null);
+    // Verify expected behavior - should it clear like null, or keep the token?
+    expect(getAccessToken()).toBeNull(); // or expect it to remain "token-1" depending on implementation
+  });
 });

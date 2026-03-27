@@ -66,7 +66,7 @@ const PodSchema = new Schema<IPod>(
     currentCycle: { type: Number, default: 1 },
     resetCount: { type: Number, default: 0 },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
-    lastEvaluatedAt: { type: Date },
+    lastEvaluatedAt: { type: Date, index: true },
   },
   {
     timestamps: true,

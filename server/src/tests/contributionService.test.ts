@@ -21,17 +21,23 @@ import User from "../models/User";
 import Transaction from "../models/Transaction";
 
 async function makeUser(name: string) {
+  let userCounter = 0;
+  const suffix = String(userCounter++).padStart(4, "0");
+
   return User.create({
     name,
     email: `${name.toLowerCase().replaceAll(/\s+/g, "")}@test.com`,
-    phone: "+2348100000000",
+    phone: `+23481000${suffix}`,
     passwordHash: "hashed",
     bankAccountNumber: "0123456789",
     bankCode: "057",
   });
 }
 
-async function makePod(creatorId: Types.ObjectId, memberIds: Types.ObjectId[] = []) {
+async function makePod(
+  creatorId: Types.ObjectId,
+  memberIds: Types.ObjectId[] = [],
+) {
   return Pod.create({
     name: "Contribution Pod",
     contributionAmount: 5000,
@@ -130,9 +136,30 @@ describe("recordContribution", () => {
 
     // Fill all 3 allowed cycles (maxMembers - 1 = 3)
     await Transaction.insertMany([
-      { pod: pod._id, user: user._id, amount: 5000, status: "success", type: "contribution", cycleNumber: 1 },
-      { pod: pod._id, user: user._id, amount: 5000, status: "success", type: "contribution", cycleNumber: 2 },
-      { pod: pod._id, user: user._id, amount: 5000, status: "success", type: "contribution", cycleNumber: 3 },
+      {
+        pod: pod._id,
+        user: user._id,
+        amount: 5000,
+        status: "success",
+        type: "contribution",
+        cycleNumber: 1,
+      },
+      {
+        pod: pod._id,
+        user: user._id,
+        amount: 5000,
+        status: "success",
+        type: "contribution",
+        cycleNumber: 2,
+      },
+      {
+        pod: pod._id,
+        user: user._id,
+        amount: 5000,
+        status: "success",
+        type: "contribution",
+        cycleNumber: 3,
+      },
     ]);
 
     await expect(
@@ -153,8 +180,22 @@ describe("recordContribution", () => {
 
     // Pay 2 out of 3 allowed
     await Transaction.insertMany([
-      { pod: pod._id, user: user._id, amount: 5000, status: "success", type: "contribution", cycleNumber: 1 },
-      { pod: pod._id, user: user._id, amount: 5000, status: "success", type: "contribution", cycleNumber: 2 },
+      {
+        pod: pod._id,
+        user: user._id,
+        amount: 5000,
+        status: "success",
+        type: "contribution",
+        cycleNumber: 1,
+      },
+      {
+        pod: pod._id,
+        user: user._id,
+        amount: 5000,
+        status: "success",
+        type: "contribution",
+        cycleNumber: 2,
+      },
     ]);
 
     await expect(

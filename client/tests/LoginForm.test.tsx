@@ -1,5 +1,11 @@
 import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test";
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  cleanup,
+} from "@testing-library/react";
 
 // ─── Mock externals before importing the component ──────────────────────────
 
@@ -26,9 +32,15 @@ mock.module("@/contexts/AuthContext", () => ({
   }),
 }));
 
-let loginMock = mock((...args: unknown[]) =>
-  Promise.resolve({ data: { token: "jwt", user: { id: "1", name: "Test", email: "t@t.com" }, args } }),
-);
+const createSuccessLoginMock = () =>
+  mock((...args: unknown[]) => {
+    console.debug("loginMock", args);
+    return Promise.resolve({
+      data: { token: "jwt", user: { id: "1", name: "Test", email: "t@t.com" } },
+    });
+  });
+
+let loginMock = createSuccessLoginMock();
 
 mock.module("@/lib/api", () => ({
   authApi: {
@@ -44,9 +56,7 @@ beforeEach(() => {
   pushFn.mockClear();
   setAuthFn.mockClear();
   toastErrorFn.mockClear();
-  loginMock = mock((...args: unknown[]) =>
-    Promise.resolve({ data: { token: "jwt", user: { id: "1", name: "Test", email: "t@t.com" }, args } }),
-  );
+  loginMock = createSuccessLoginMock();
 });
 
 describe("LoginForm", () => {
@@ -82,11 +92,9 @@ describe("LoginForm", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
 
-    await waitFor(() => {
-      expect(loginMock).toHaveBeenCalled();
-      expect(setAuthFn).toHaveBeenCalled();
-      expect(pushFn).toHaveBeenCalledWith("/dashboard");
-    });
+    await waitFor(() => expect(loginMock).toHaveBeenCalled());
+    await waitFor(() => expect(setAuthFn).toHaveBeenCalled());
+    await waitFor(() => expect(pushFn).toHaveBeenCalledWith("/dashboard"));
   });
 
   it("shows error toast on 401", async () => {

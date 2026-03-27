@@ -1,5 +1,11 @@
 import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test";
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  cleanup,
+} from "@testing-library/react";
 import { AxiosError, AxiosResponse } from "axios";
 
 // ─── Mock externals ─────────────────────────────────────────────────────────
@@ -27,11 +33,18 @@ mock.module("@/contexts/AuthContext", () => ({
   }),
 }));
 
-let registerMock = mock((...args: unknown[]) => {
-  return Promise.resolve({
-    data: { token: "jwt", user: { id: "1", name: "Amara", email: "a@test.com" }, args },
+const createSuccessRegisterMock = () =>
+  mock((...args: unknown[]) => {
+    console.debug("registerMock", args);
+    return Promise.resolve({
+      data: {
+        token: "jwt",
+        user: { id: "1", name: "Amara", email: "a@test.com" },
+      },
+    });
   });
-});
+
+let registerMock = createSuccessRegisterMock();
 
 mock.module("@/lib/api", () => ({
   authApi: {
@@ -47,11 +60,7 @@ beforeEach(() => {
   pushFn.mockClear();
   setAuthFn.mockClear();
   toastErrorFn.mockClear();
-  registerMock = mock((...args: unknown[]) => {
-    return Promise.resolve({
-      data: { token: "jwt", user: { id: "1", name: "Amara", email: "a@test.com" }, args },
-    });
-  });
+  registerMock = createSuccessRegisterMock();
 });
 
 function fillForm(overrides: Record<string, string> = {}) {
@@ -78,7 +87,9 @@ describe("RegisterForm", () => {
     expect(screen.getByLabelText("Phone Number")).toBeDefined();
     expect(screen.getByLabelText("Password")).toBeDefined();
     expect(screen.getByLabelText("Confirm Password")).toBeDefined();
-    expect(screen.getByRole("button", { name: /create account/i })).toBeDefined();
+    expect(
+      screen.getByRole("button", { name: /create account/i }),
+    ).toBeDefined();
   });
 
   it("shows error for short name", async () => {

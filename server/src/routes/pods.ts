@@ -147,7 +147,10 @@ router.get(
       try {
         balance = await getWalletBalance(pod.walletId);
       } catch (err) {
-        console.warn(`[pods/wallet-balance] Interswitch fetch failed, falling back to ledger`, err);
+        console.warn(
+          `[pods/wallet-balance] Interswitch fetch failed, falling back to ledger`,
+          err,
+        );
         balance = pod.contributionTotal;
       }
 
@@ -589,7 +592,15 @@ router.post(
       const result = await evaluateAndReorderQueue(podId);
 
       // Mark the pod as evaluated so the cron job doesn't re-evaluate this cycle
-      await Pod.findByIdAndUpdate(podId, { lastEvaluatedAt: new Date() });
+      try {
+        await Pod.findByIdAndUpdate(podId, { lastEvaluatedAt: new Date() });
+      } catch (updateErr) {
+        console.warn(
+          `[pods/evaluate] Failed to update lastEvaluatedAt for pod ${podId}`,
+          updateErr,
+        );
+        // Non-fatal: evaluation succeeded, timestamp update is advisory for cron
+      }
 
       res.json(result);
     } catch (err) {
@@ -722,11 +733,9 @@ router.get(
         (m) => (m._id as { toString(): string }).toString() === req.user!.id,
       );
       if (!isMember) {
-        res
-          .status(403)
-          .json({
-            error: "Only pod members can view the contribution matrix",
-          });
+        res.status(403).json({
+          error: "Only pod members can view the contribution matrix",
+        });
         return;
       }
 

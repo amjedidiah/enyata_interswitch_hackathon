@@ -50,7 +50,6 @@ export interface Pod {
   lastEvaluatedAt?: string;
 }
 
-
 function axErrMsg(e: unknown): string {
   const ax = e as AxiosError<{ error?: string }>;
   return ax.response?.data?.error ?? (e as Error).message;
@@ -395,9 +394,9 @@ function AdminPodClient({ pod: initialPod }: Readonly<{ pod: Pod }>) {
                 {Array.from({ length: pod.maxMembers }, (_, i) => i + 1).map(
                   (c) => (
                     <option key={c} value={c}>
-                      Cycle {c}
-                      {c === pod.currentCycle ? " (current)" : ""}{" "}
-                      {c > pod.currentCycle ? " (future)" : ""} —{" "}
+                      Cycle {c} {c < pod.currentCycle && " (past)"}
+                      {c === pod.currentCycle && " (current)"}
+                      {c > pod.currentCycle && " (future)"} —{" "}
                       {ngn(pod.contributionAmount)}
                     </option>
                   ),

@@ -26,9 +26,7 @@ router.post(
       });
     } catch (err) {
       console.error("[cron/run-evaluations]", err);
-      res
-        .status(500)
-        .json({ error: "Evaluation run failed", detail: String(err) });
+      res.status(500).json({ error: "Evaluation run failed" });
     }
   },
 );
