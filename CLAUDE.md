@@ -60,7 +60,7 @@ curl -X POST http://localhost:4000/api/cron/run-deductions \
 **Services** (`server/src/services/`):
 
 | File | Responsibility |
-|------|---------------|
+| ------ | --------------- |
 | `interswitch.ts` | Interswitch API wrapper — OAuth token caching, wallet CRUD, virtual account callback credit, disbursement |
 | `trustAgent.ts` | DeepSeek V3 AI via LangChain — scores user reliability 0–100 with structured Zod output |
 | `queueService.ts` | Scores all pod members, reorders queue (risky members with score <50 move to end) |
@@ -165,18 +165,20 @@ Days 2–4 evaluation focus: Interswitch API integration depth and AI orchestrat
 
 ## Demo Flow
 
-1. **Signup** — register a new account (validates email, phone, password strength)
-2. **Login** — sign in with the new account (JWT issued, silent refresh on reload)
-3. **Create Pod + Wallet** — open `/pods?create=1` modal, fill details + 4-digit wallet PIN → pod created, Interswitch wallet provisioned (retry via manage page if sandbox flaky)
-4. **Contributions** — members contribute via `POST /api/payments/contribute`; seed data includes on-time, late, and missed payments across users to show timing variety
-5. **AI Evaluation** — admin navigates to manage page → "Run AI Evaluation" → DeepSeek scores all members → queue reorders (risky members pushed to end) → `TrustScoreCard` shows score + reasoning
-6. **Trust Score Contrast** — compare a prompt payer (score 80–100, position held) vs a delinquent payer (score <50, moved to end with `movedByAI` banner + reasoning)
-7. **Manual Admin Funding** — admin records an offline/cash contribution for a member via the manage page form (select member + cycle)
-8. **Wallet Payout** — admin triggers payout → debt deducted for missed cycles → Interswitch disburses to first queue recipient's bank account → recipient moves to "Paid Out"
-9. **Cycle Reset** — after all members paid out (pod status "completed") → admin resets → queue restored, `currentCycle` back to 1, new rotation begins
-10. **Logout** — clears session, redirects to login
+All 10 steps have been verified as implemented and demo-ready.
 
-**Seed shortcut**: Run the seed endpoint to prepopulate 4 demo users with varied payment histories, 1 pod, and 50+ transactions — skips steps 1–4 for faster demos.
+1. **Signup** — register a new account at `/register` (validates name 4+ chars, email, password 8+ with uppercase + special, phone 7-15 digits). Sets JWT + HttpOnly refresh cookie.
+2. **Login** — sign in at `/login` (JWT issued, silent refresh via `POST /auth/refresh` on reload). Supports `?next=` redirect param.
+3. **Create Pod + Wallet** — open `/pods?create=1` modal, fill name, amount, frequency, max members + 4-digit wallet PIN → pod created, Interswitch wallet provisioned automatically. If wallet fails, admin retries via `WalletBalanceWidget` on manage page (`POST /api/pods/:id/provision-wallet`).
+4. **Contributions (on-time, late, early)** — members contribute via `ContributeButton` modal (supports pre-paying future cycles). `ContributionMatrix` shows per-member × per-cycle grid with timing badges: green check = on-time, yellow/warning check = late, red X = missed. Timing is classified by comparing transaction timestamp against `cycleDueDate()`. Seed data includes all three timing varieties across 3 cycles.
+5. **AI Evaluation** — admin navigates to `/my-pods/[id]/manage` → "Run AI Evaluation" button → DeepSeek scores all members via `trustAgent.ts` → queue reorders (members with score <50 pushed to end) → `TrustScoreCard` shows score ring + reasoning + qualitative label. 60-second cooldown between runs, 15-second polling for results.
+6. **Trust Score Contrast** — `TrustScoreCard` displays qualitative labels: "Prompt payer" (≥80), "Generally reliable" (≥60), "Mixed record" (≥50), "At risk" (<50 or riskFlag). Delinquent members show red score ring + `movedByAI` yellow banner ("Moved to end of queue by AI Trust Agent"). Seed contrast: Amara (92, green, "Prompt payer") vs Dami (43, red, "At risk" + movedByAI banner).
+7. **Manual Admin Funding** — admin records an offline/cash contribution via manage page form: select member, select cycle, optional datetime picker to backdate contributions (for simulating on-time vs late timing in demos). Calls `POST /api/payments/manual`.
+8. **Wallet Payout** — admin triggers `POST /api/pods/:id/payout` → runs fresh AI evaluation → deducts debt for missed cycles → Interswitch disburses `netPayoutAmount` to first queue recipient's bank account → recipient moves to `paidOutMembers`. Partial payout badge shown when debt was deducted.
+9. **Cycle Reset** — after all members paid out (pod status "completed") → "Start New Rotation" button appears → `POST /api/pods/:id/reset` → queue restored in original order, `currentCycle` back to 1, `resetCount` incremented, status back to "active".
+10. **Logout** — Navbar dropdown → clears HttpOnly refresh cookie + in-memory access token + `has_session` hint cookie → redirects to `/login`.
+
+**Seed shortcut**: Run the seed endpoint to prepopulate 4 demo users (`amara@demo.com`, `bola@demo.com`, `chidi@demo.com`, `dami@demo.com` — all share `SEED_PASSWORD`), 1 pod ("Lagos Gig Workers Pod"), and 50+ transactions with varied timing — skips steps 1–4 for faster demos.
 
 ## Submission
 

@@ -7,7 +7,7 @@ AI-powered digital ROSCA (Rotating Savings and Credit Association) platform that
 ## Live Demo
 
 | Service | URL |
-|---------|-----|
+| -------- | ----- |
 | **Frontend** | [https://ajo-flow.vercel.app](https://ajo-flow.vercel.app) |
 | **Backend API** | [https://enyata-interswitch-hackathon.onrender.com](https://enyata-interswitch-hackathon.onrender.com) |
 
@@ -16,7 +16,7 @@ AI-powered digital ROSCA (Rotating Savings and Credit Association) platform that
 After seeding the database, use any of these demo accounts:
 
 | Email | Password |
-|-------|----------|
+| -------- | ---------- |
 | `amara@demo.com` | *2nuRZFFzwgawcEzo* |
 | `bola@demo.com` | *(same password)* |
 | `chidi@demo.com` | *(same password)* |
@@ -72,7 +72,7 @@ Contributions are classified at AI scoring time (not enforced at payment time):
 ## Tech Stack
 
 | Layer | Technology |
-|-------|-----------|
+| -------- | ----------- |
 | Frontend | Next.js 16 (App Router), Tailwind CSS, Framer Motion |
 | Backend | Node.js + Express + TypeScript |
 | Database | MongoDB Atlas + Mongoose |
