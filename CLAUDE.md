@@ -109,6 +109,28 @@ Three route groups. `<Navbar />` is in root `layout.tsx` (global); `(auth)/layou
 
 **Pay-Out:** Admin triggers `POST /api/pods/:id/payout` → verifies wallet balance ≥ `contributionAmount × members.length` → Interswitch disbursement to first queue recipient's bank account.
 
+### Contribution Timing
+
+Contribution timing is **classified but not enforced** — the system always accepts contributions regardless of when they arrive. Timing matters only for AI trust scoring and queue reordering.
+
+**How due dates are calculated** (`queueService.ts` → `cycleDueDate()`):
+
+- Cycle 1 due = pod creation date @ 23:59:59
+- Each subsequent cycle offset by frequency: +1 day (daily), +7 days (weekly), +1 month (monthly)
+
+**Classification at scoring time** (`queueService.ts` lines 101–117):
+
+- **On-time**: transaction `timestamp` ≤ `cycleDueDate(pod, cycleNumber)` — scored favourably (80–100 range)
+- **Late**: transaction `timestamp` > `cycleDueDate(pod, cycleNumber)` — penalised in trust score (drops toward 40–59 or lower depending on frequency)
+- **Early**: no distinct classification — contributions before the due date count as on-time. No bonus for early payment.
+- **Missed**: no transaction recorded for a cycle — heaviest penalty; also triggers debt deduction in `payoutService.ts` (lines 65–87) which reduces payout amount
+
+**Where timing feeds in:**
+
+- `queueService.ts` collects `onTimePayments` / `latePayments` counts per member → passed to AI trust agent
+- `trustAgent.ts` prompt instructs DeepSeek to score members on these stats (plus cross-pod platform history)
+- `payoutService.ts` deducts debt for *missed* cycles only — late-but-paid contributions count fully toward payout
+
 ### Environment Variables
 
 Copy `server/.env.example` to `server/.env`. Key variables:
@@ -140,6 +162,21 @@ If wallet creation hits sandbox limits, the pod is still created with `walletId:
 ## Key Judging Criteria
 
 Days 2–4 evaluation focus: Interswitch API integration depth and AI orchestration quality. The AI reasoning displayed in `TrustScoreCard.tsx` ("why was this user moved?") is explicitly a judging criterion — prioritize surfacing it in the UI.
+
+## Demo Flow
+
+1. **Signup** — register a new account (validates email, phone, password strength)
+2. **Login** — sign in with the new account (JWT issued, silent refresh on reload)
+3. **Create Pod + Wallet** — open `/pods?create=1` modal, fill details + 4-digit wallet PIN → pod created, Interswitch wallet provisioned (retry via manage page if sandbox flaky)
+4. **Contributions** — members contribute via `POST /api/payments/contribute`; seed data includes on-time, late, and missed payments across users to show timing variety
+5. **AI Evaluation** — admin navigates to manage page → "Run AI Evaluation" → DeepSeek scores all members → queue reorders (risky members pushed to end) → `TrustScoreCard` shows score + reasoning
+6. **Trust Score Contrast** — compare a prompt payer (score 80–100, position held) vs a delinquent payer (score <50, moved to end with `movedByAI` banner + reasoning)
+7. **Manual Admin Funding** — admin records an offline/cash contribution for a member via the manage page form (select member + cycle)
+8. **Wallet Payout** — admin triggers payout → debt deducted for missed cycles → Interswitch disburses to first queue recipient's bank account → recipient moves to "Paid Out"
+9. **Cycle Reset** — after all members paid out (pod status "completed") → admin resets → queue restored, `currentCycle` back to 1, new rotation begins
+10. **Logout** — clears session, redirects to login
+
+**Seed shortcut**: Run the seed endpoint to prepopulate 4 demo users with varied payment histories, 1 pod, and 50+ transactions — skips steps 1–4 for faster demos.
 
 ## Submission
 
