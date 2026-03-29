@@ -178,10 +178,15 @@ router.post("/", async (_req: Request, res: Response): Promise<void> => {
       (t) => t.type === "contribution" && t.status === "success",
     ).length;
     const totalContributed = successContributions * CONTRIBUTION_AMOUNT;
+    const totalDisbursed = allTransactions
+      .filter((t) => t.type === "disbursement" && t.status === "success")
+      .reduce((sum, t) => sum + t.amount, 0);
+    // Ledger = credits minus debits (mirrors what payoutService does at runtime)
+    const netLedger = totalContributed - totalDisbursed;
 
     await Transaction.insertMany(allTransactions);
     await Pod.findByIdAndUpdate(pod._id, {
-      contributionTotal: totalContributed,
+      contributionTotal: netLedger,
     });
 
     // ── Seed trust scores so the dashboard AI panel is populated immediately ─
@@ -245,7 +250,7 @@ router.post("/", async (_req: Request, res: Response): Promise<void> => {
         users: SEED_USERS.length,
         pods: [pod.name, freshPod.name],
         transactions: allTransactions.length,
-        contributionTotal: totalContributed,
+        contributionTotal: netLedger,
         mechanics: {
           contributionAmount: `₦${CONTRIBUTION_AMOUNT.toLocaleString()}/cycle`,
           cycleGoal: `₦${CYCLE_GOAL.toLocaleString()} per payout (${MAX_MEMBERS} members * ₦${CONTRIBUTION_AMOUNT.toLocaleString()})`,

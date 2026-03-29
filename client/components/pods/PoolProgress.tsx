@@ -3,7 +3,10 @@ import { Pod } from "./PodHeroHeader";
 import { ngn } from "@/lib/helpers";
 
 function PoolProgress({ pod }: Readonly<{ pod: Pod }>) {
-  const cycleGoal = pod.contributionAmount * pod.maxMembers;
+  // Each cycle, (members - 1) contribute and 1 receives the payout.
+  // The recipient doesn't contribute in their own payout cycle.
+  const contributors = Math.max(pod.maxMembers - 1, 1);
+  const cycleGoal = pod.contributionAmount * contributors;
   const progress = Math.min((pod.currentCycleTotal / cycleGoal) * 100, 100);
 
   return (
@@ -11,7 +14,7 @@ function PoolProgress({ pod }: Readonly<{ pod: Pod }>) {
       <div className="flex items-center justify-between text-sm">
         <span className="flex items-center gap-1.5 text-brand-muted">
           <Wallet size={14} />
-          Cycle {pod.currentCycle} pool balance
+          Cycle {pod.currentCycle} contributions
         </span>
         <span className="font-semibold text-brand-text">
           {ngn(pod.currentCycleTotal)}{" "}

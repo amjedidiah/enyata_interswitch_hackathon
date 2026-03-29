@@ -206,7 +206,7 @@ function WalletBalanceWidget({
         </p>
         {ledgerBalance !== null && (
           <p className="text-xs text-brand-muted mt-1">
-            DB Ledger:{" "}
+            Net balance (contributions minus payouts):{" "}
             <span className="font-semibold text-brand-text">
               {ngn(ledgerBalance)}
             </span>

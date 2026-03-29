@@ -234,15 +234,18 @@ export async function evaluateAndReorderQueue(
     }
   }
 
-  // Step 1 — Pin the next recipient (position 0). Once it's your turn, it's
-  // your turn — demoting someone right before their payout based on a retroactive
-  // AI score undermines trust. The admin/creator is NOT pinned; they play by the
-  // same rules as everyone else to demonstrate fairness.
-  const [pinnedNextRecipient, ...reorderCandidates] = pod.payoutQueue;
-
   const riskMap = new Map(
     scored.map((s) => [s.userId.toString(), s.riskFlag]),
   );
+
+  // Step 1 — Pin the next recipient (position 0) ONLY if they are not risky.
+  // If the next-in-line member has a riskFlag (score < 50), they are demoted
+  // like everyone else — the pod should not pay out to someone the AI has
+  // flagged as unreliable.
+  const [firstInQueue, ...rest] = pod.payoutQueue;
+  const firstIsRisky = riskMap.get(firstInQueue?.toString() ?? "") ?? false;
+  const pinnedNextRecipient = firstIsRisky ? null : firstInQueue;
+  const reorderCandidates = firstIsRisky ? pod.payoutQueue.slice() : rest;
 
   // AI sort on remaining members only: safe keep relative order, risky go to end.
   const safe = reorderCandidates.filter((id) => !riskMap.get(id.toString()));
@@ -251,8 +254,6 @@ export async function evaluateAndReorderQueue(
   // Step 2 — Deterministic secondary sort within each bucket: members who have paid
   // the current cycle rank above those who haven't, regardless of AI trust score.
   const remainingQueue = [...safe, ...risky];
-  const nextRecipient = pinnedNextRecipient;
-
   const paidThisCycle = new Set(
     (
       await Transaction.distinct("user", {
@@ -269,14 +270,13 @@ export async function evaluateAndReorderQueue(
     ...arr.filter((id) => !paidThisCycle.has(id.toString())),
   ];
 
-  // Re-partition remaining members (excluding next recipient) and sort within buckets.
+  // Re-partition remaining members (excluding pinned recipient) and sort within buckets.
   const remainingSafe = remainingQueue.filter((id) => !riskMap.get(id.toString()));
   const remainingRisky = remainingQueue.filter((id) => riskMap.get(id.toString()));
 
-  // Final order: next recipient → safe+paid → safe+unpaid → risky+paid → risky+unpaid
-  pod.payoutQueue = nextRecipient
-    ? [nextRecipient, ...sortByPayment(remainingSafe), ...sortByPayment(remainingRisky)]
-    : [];
+  // Final order: [pinned recipient if safe] → safe+paid → safe+unpaid → risky+paid → risky+unpaid
+  const sorted = [...sortByPayment(remainingSafe), ...sortByPayment(remainingRisky)];
+  pod.payoutQueue = pinnedNextRecipient ? [pinnedNextRecipient, ...sorted] : sorted;
   await pod.save();
   await pod.populate("members", "name email");
   await pod.populate("payoutQueue", "name email");
