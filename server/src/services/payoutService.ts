@@ -2,7 +2,6 @@ import Pod, { IPod } from "../models/Pod";
 import User from "../models/User";
 import Transaction from "../models/Transaction";
 import * as interswitch from "./interswitch";
-import { evaluateAndReorderQueue } from "./queueService";
 
 /**
  * Triggers a payout for the next recipient in the pod's payout queue.
@@ -31,21 +30,8 @@ export async function triggerPayout(podId: string): Promise<IPod> {
     );
   }
 
-  // Always re-evaluate the queue before disbursing so the AI order is fresh
-  // and the deterministic payment-status sort reflects the latest contributions.
-  console.info(`[payout] Running pre-payout AI evaluation for pod ${podId}`);
-  try {
-    await evaluateAndReorderQueue(podId);
-  } catch (err) {
-    // Evaluation failure should not block payout — log and proceed with existing order
-    console.warn(`[payout] Pre-payout evaluation failed, using existing queue order: ${err}`);
-  }
-
-  // Re-fetch pod after evaluation so we have the updated queue
-  const freshPod = await Pod.findById(podId);
-  if (!freshPod) throw new Error("Pod not found after evaluation");
-
-  const recipientId = freshPod.payoutQueue[0];
+  // Use existing queue order
+  const recipientId = pod.payoutQueue[0];
   const recipient = await User.findById(recipientId);
   if (!recipient) throw new Error("Recipient user not found");
 
@@ -57,7 +43,7 @@ export async function triggerPayout(podId: string): Promise<IPod> {
 
   // Gross payout = one full cycle (all members contribute once).
   // The recipient does not contribute in their own payout cycle — that is by design.
-  const payoutAmount = freshPod.contributionAmount * freshPod.members.length;
+  const payoutAmount = pod.contributionAmount * pod.maxMembers;
 
   // Debt deduction: if the recipient missed contributions in any prior cycle,
   // their payout is reduced by that amount. The shortfall is recovered here
@@ -67,14 +53,14 @@ export async function triggerPayout(podId: string): Promise<IPod> {
     user: recipientId,
     type: "contribution",
     status: { $in: ["success", "manual"] },
-    cycleNumber: { $lt: freshPod.currentCycle },
+    cycleNumber: { $lt: pod.currentCycle },
   });
 
   let debtAmount = 0;
   const missedCycleNumbers: number[] = [];
-  for (let cycle = 1; cycle < freshPod.currentCycle; cycle++) {
+  for (let cycle = 1; cycle < pod.currentCycle; cycle++) {
     if (!paidPriorCycles.includes(cycle)) {
-      debtAmount += freshPod.contributionAmount;
+      debtAmount += pod.contributionAmount;
       missedCycleNumbers.push(cycle);
     }
   }
@@ -83,13 +69,13 @@ export async function triggerPayout(podId: string): Promise<IPod> {
 
   if (debtAmount > 0) {
     console.info(
-      `[payout] Debt deduction — ${recipient.name} missed ${debtAmount / freshPod.contributionAmount} prior cycle(s). ` +
+      `[payout] Debt deduction — ${recipient.name} missed ${debtAmount / pod.contributionAmount} prior cycle(s). ` +
         `Gross: ₦${payoutAmount.toLocaleString()}, debt: ₦${debtAmount.toLocaleString()}, net: ₦${netPayoutAmount.toLocaleString()}`,
     );
   }
 
   console.info(
-    `[payout] Initiating — pod: "${freshPod.name}" (${podId}), recipient: ${recipient.name}, ` +
+    `[payout] Initiating — pod: "${pod.name}" (${podId}), recipient: ${recipient.name}, ` +
       `gross: ₦${payoutAmount.toLocaleString()}, net: ₦${netPayoutAmount.toLocaleString()}`,
   );
 
@@ -97,10 +83,13 @@ export async function triggerPayout(podId: string): Promise<IPod> {
   // Fall back to the DB ledger if the API call fails (sandbox instability).
   let walletBalance: number;
   try {
-    walletBalance = await interswitch.getWalletBalance(freshPod.walletId!);
+    walletBalance = await interswitch.getWalletBalance(pod.walletId);
   } catch (err) {
-    console.warn(`[payout] Interswitch balance check failed, falling back to DB ledger:`, err);
-    walletBalance = freshPod.contributionTotal;
+    console.warn(
+      `[payout] Interswitch balance check failed, falling back to DB ledger:`,
+      err,
+    );
+    walletBalance = pod.contributionTotal;
   }
 
   if (walletBalance < netPayoutAmount) {
@@ -115,42 +104,51 @@ export async function triggerPayout(podId: string): Promise<IPod> {
     // Debit the Interswitch wallet (real fund movement)
     try {
       await interswitch.disburseFunds(
-        freshPod.walletId!,
+        pod.walletId,
         netPayoutAmount,
         reference,
-        freshPod.walletPin,
-        `AjoFlow payout - ${freshPod.name} cycle ${freshPod.currentCycle}`,
+        pod.walletPin,
+        `AjoFlow payout - ${pod.name} cycle ${pod.currentCycle}`,
       );
     } catch (err) {
       // On timeout or network error, re-query Interswitch to check if the
       // transaction actually went through before reporting failure.
-      if (isTimeoutOrNetworkError(err)) {
-        console.warn(`[payout] disburseFunds threw a timeout/network error for ref ${reference} — re-querying status`);
-        try {
-          const status = await interswitch.requeryTransaction(reference);
-          const txStatus = String(status.status).toLowerCase();
-          if (txStatus === "successful" || txStatus === "completed" || txStatus === "approved") {
-            console.info(`[payout] Re-query confirms transaction ${reference} succeeded despite timeout`);
-            // Fall through to success path below
-          } else {
-            throw new Error(
-              `Disbursement failed (re-query status: ${status.status}). Ref: ${reference}. Original error: ${(err as Error).message}`,
-            );
-          }
-        } catch (reqErr) {
-          // Re-query itself failed — report both errors so admin can investigate
-          console.error(`[payout] Re-query also failed for ref ${reference}:`, reqErr);
+      if (!isTimeoutOrNetworkError(err)) throw err;
+
+      console.warn(
+        `[payout] disburseFunds threw a timeout/network error for ref ${reference} — re-querying status`,
+      );
+
+      try {
+        const status = await interswitch.requeryTransaction(reference);
+        const txStatus = String(status.status).toLowerCase();
+        if (
+          txStatus === "successful" ||
+          txStatus === "completed" ||
+          txStatus === "approved"
+        ) {
+          console.info(
+            `[payout] Re-query confirms transaction ${reference} succeeded despite timeout`,
+          );
+          // Fall through to success path below
+        } else {
           throw new Error(
-            `Disbursement status unknown — re-query failed. Ref: ${reference}. Do NOT retry without checking Interswitch dashboard. Original error: ${(err as Error).message}`,
+            `Disbursement failed (re-query status: ${status.status}). Ref: ${reference}. Original error: ${(err as Error).message}`,
           );
         }
-      } else {
-        // Clear rejection (4xx) — safe to surface directly
-        throw err;
+      } catch (reqErr) {
+        // Re-query itself failed — report both errors so admin can investigate
+        console.error(
+          `[payout] Re-query also failed for ref ${reference}:`,
+          reqErr,
+        );
+        throw new Error(
+          `Disbursement status unknown — re-query failed. Ref: ${reference}. Do NOT retry without checking Interswitch dashboard. Original error: ${(err as Error).message}`,
+        );
       }
     }
     // Also debit the internal DB ledger to keep it in sync
-    freshPod.contributionTotal -= netPayoutAmount;
+    pod.contributionTotal -= netPayoutAmount;
     console.info(
       `[payout] Disbursement successful — ₦${netPayoutAmount.toLocaleString()} → ${recipient.name} (${recipient.bankAccountNumber}), ref: ${reference}`,
     );
@@ -161,18 +159,18 @@ export async function triggerPayout(podId: string): Promise<IPod> {
   }
 
   // Move recipient from front of queue to paidOutMembers for history tracking
-  freshPod.payoutQueue.shift();
-  freshPod.paidOutMembers.push(recipientId);
+  pod.payoutQueue.shift();
+  pod.paidOutMembers.push(recipientId);
 
-  if (freshPod.payoutQueue.length === 0) {
+  if (pod.payoutQueue.length === 0) {
     // All cycles done — mark completed. currentCycle is NOT incremented here;
     // it correctly stays at the last cycle number (e.g. 4 of 4).
-    freshPod.status = "completed";
+    pod.status = "completed";
   } else {
-    freshPod.currentCycle += 1;
+    pod.currentCycle += 1;
   }
 
-  await freshPod.save();
+  await pod.save();
 
   try {
     await Transaction.create({
@@ -184,7 +182,7 @@ export async function triggerPayout(podId: string): Promise<IPod> {
       missedCycles: missedCycleNumbers,
       status: "success",
       type: "disbursement",
-      cycleNumber: freshPod.currentCycle,
+      cycleNumber: pod.currentCycle,
       interswitchRef: reference,
     });
   } catch (err) {
@@ -197,7 +195,7 @@ export async function triggerPayout(podId: string): Promise<IPod> {
     );
   }
 
-  return freshPod;
+  return pod;
 }
 
 /**

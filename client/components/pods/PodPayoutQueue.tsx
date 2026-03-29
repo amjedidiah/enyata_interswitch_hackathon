@@ -27,6 +27,18 @@ interface PodPayoutQueueProps {
   partialPayoutMemberIds?: string[];
   nextRecipientMissedCycles?: number[];
   refreshKey?: number;
+  lastEvaluatedAt?: string;
+}
+
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
 }
 
 function PodPayoutQueue({
@@ -36,6 +48,7 @@ function PodPayoutQueue({
   partialPayoutMemberIds = [],
   nextRecipientMissedCycles = [],
   refreshKey = 0,
+  lastEvaluatedAt,
 }: Readonly<PodPayoutQueueProps>) {
   const [trustScores, setTrustScores] = useState<
     Record<string, TrustScoreData>
@@ -68,6 +81,11 @@ function PodPayoutQueue({
           </span>
         </div>
       </div>
+      {lastEvaluatedAt && (
+        <p className="text-[11px] text-brand-muted mb-3 -mt-2">
+          Queue ranked by AI · updated {timeAgo(lastEvaluatedAt)}
+        </p>
+      )}
 
       {payoutQueue.length === 0 ? (
         <p className="text-sm text-brand-muted">

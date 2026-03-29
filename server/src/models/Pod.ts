@@ -27,6 +27,8 @@ export interface IPod extends Document {
   resetCount: number;
   createdBy: Types.ObjectId;
   createdAt: Date;
+  /** Set by the scheduled cron job after a cycle-deadline evaluation. */
+  lastEvaluatedAt?: Date;
 }
 
 const PodSchema = new Schema<IPod>(
@@ -64,6 +66,7 @@ const PodSchema = new Schema<IPod>(
     currentCycle: { type: Number, default: 1 },
     resetCount: { type: Number, default: 0 },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    lastEvaluatedAt: { type: Date },
   },
   {
     timestamps: true,

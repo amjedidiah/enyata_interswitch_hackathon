@@ -25,6 +25,7 @@ export interface Pod {
   createdBy: string;
   partialPayoutMemberIds?: string[];
   nextRecipientMissedCycles?: number[];
+  lastEvaluatedAt?: string;
   virtualAccount?: {
     accountName: string;
     accountNumber: string;

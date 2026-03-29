@@ -1,7 +1,6 @@
 "use client";
 
-import { ArrowRight, PartyPopper, X } from "lucide-react";
-import Link from "next/link";
+import { PartyPopper, X } from "lucide-react";
 import { useState } from "react";
 
 function WelcomeBanner({
@@ -30,13 +29,6 @@ function WelcomeBanner({
           Your account is ready. Browse pods to join your first savings circle,
           or create your own.
         </p>
-        <Link
-          href="/pods"
-          className="inline-flex items-center gap-1.5 mt-3 text-sm font-semibold text-brand-accent hover:underline"
-        >
-          Browse Pods
-          <ArrowRight size={14} />
-        </Link>
       </div>
       <button
         onClick={() => setShowWelcome(false)}

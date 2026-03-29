@@ -47,6 +47,7 @@ export interface Pod {
   createdBy: string;
   partialPayoutMemberIds?: string[];
   nextRecipientMissedCycles?: number[];
+  lastEvaluatedAt?: string;
 }
 
 
@@ -304,6 +305,7 @@ function AdminPodClient({ pod: initialPod }: Readonly<{ pod: Pod }>) {
           partialPayoutMemberIds={pod.partialPayoutMemberIds}
           nextRecipientMissedCycles={pod.nextRecipientMissedCycles}
           refreshKey={trustRefreshKey}
+          lastEvaluatedAt={pod.lastEvaluatedAt}
         />
 
         {/* Contribution Matrix — member × cycle payment status */}

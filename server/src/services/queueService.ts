@@ -33,7 +33,7 @@ export interface EvaluationResult {
  * date and contribution frequency. Contributions made after this date are
  * considered "late" by the trust scoring agent.
  */
-function cycleDueDate(
+export function cycleDueDate(
   frequency: "daily" | "weekly" | "monthly",
   createdAt: Date,
   cycleNumber: number,
@@ -242,12 +242,7 @@ export async function evaluateAndReorderQueue(
     }
   }
 
-  const scoreMap = new Map(
-    scored.map((s) => [s.userId.toString(), s.score]),
-  );
-  const riskMap = new Map(
-    scored.map((s) => [s.userId.toString(), s.riskFlag]),
-  );
+  const scoreMap = new Map(scored.map((s) => [s.userId.toString(), s.score]));
 
   // Rank the entire queue by trust score (highest first).
   // Within tied scores, members who have paid the current cycle rank higher.

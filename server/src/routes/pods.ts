@@ -596,6 +596,10 @@ router.post(
         ? req.params.id[0]
         : req.params.id;
       const result = await evaluateAndReorderQueue(podId);
+
+      // Mark the pod as evaluated so the cron job doesn't re-evaluate this cycle
+      await Pod.findByIdAndUpdate(podId, { lastEvaluatedAt: new Date() });
+
       res.json(result);
     } catch (err) {
       console.error(`[pods/evaluate] id=${req.params.id}`, err);

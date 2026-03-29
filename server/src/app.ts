@@ -7,6 +7,7 @@ import trustRoutes from "./routes/trust";
 import paymentRoutes from "./routes/payments";
 import podRoutes from "./routes/pods";
 import statsRoutes from "./routes/stats";
+import cronRoutes from "./routes/cron";
 
 /**
  * Creates and returns a configured Express app without connecting to MongoDB
@@ -45,6 +46,7 @@ export function createApp() {
   app.use("/api/seed", seedRoutes);
   app.use("/api/trust", trustRoutes);
   app.use("/api/payments", paymentRoutes);
+  app.use("/api/cron", cronRoutes);
 
   app.get("/", (_req, res) =>
     res.json({

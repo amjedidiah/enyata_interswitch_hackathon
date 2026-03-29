@@ -17,6 +17,7 @@ interface Props {
   paidOutMembers: Member[];
   partialPayoutMemberIds?: string[];
   nextRecipientMissedCycles?: number[];
+  lastEvaluatedAt?: string;
   memberIds: string[];
   isFull: boolean;
   userId: string | null;
@@ -33,6 +34,7 @@ function MemberActivitySection({
   paidOutMembers,
   partialPayoutMemberIds = [],
   nextRecipientMissedCycles = [],
+  lastEvaluatedAt,
   memberIds,
   isFull,
   userId,
@@ -66,6 +68,7 @@ function MemberActivitySection({
         paidOutMembers={paidOutMembers}
         partialPayoutMemberIds={partialPayoutMemberIds}
         nextRecipientMissedCycles={nextRecipientMissedCycles}
+        lastEvaluatedAt={lastEvaluatedAt}
       />
       <ActivityFeed podId={podId} />
 

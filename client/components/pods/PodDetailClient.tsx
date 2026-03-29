@@ -46,6 +46,7 @@ function PodDetailClient({
         paidOutMembers={pod.paidOutMembers}
         partialPayoutMemberIds={pod.partialPayoutMemberIds}
         nextRecipientMissedCycles={pod.nextRecipientMissedCycles}
+        lastEvaluatedAt={pod.lastEvaluatedAt}
         memberIds={pod.members.map((m) => m._id)}
         isFull={isFull}
         userId={userId}
