@@ -1,4 +1,5 @@
 import { Types } from "mongoose";
+import consola from "consola";
 import Pod, { IPod } from "../models/Pod";
 import User from "../models/User";
 import Transaction from "../models/Transaction";
@@ -250,7 +251,7 @@ export async function evaluateAndReorderQueue(
         riskFlag: result.riskFlag,
       });
     } catch (err) {
-      console.error(
+      consola.error(
         `[queueService] Failed to score member ${memberId} — skipping:`,
         err,
       );

@@ -4,8 +4,9 @@
  * Subsequent test runs use the cached binary and connect instantly.
  */
 import { MongoMemoryServer } from "mongodb-memory-server";
+import consola from "consola";
 
-console.info("[test:setup] Downloading MongoDB binary if not already cached…");
+consola.info("[test:setup] Downloading MongoDB binary if not already cached…");
 const server = await MongoMemoryServer.create();
 await server.stop();
-console.info("[test:setup] Done — binary is cached and ready.");
+consola.info("[test:setup] Done — binary is cached and ready.");

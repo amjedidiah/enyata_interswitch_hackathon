@@ -1,3 +1,4 @@
+import consola from "consola";
 import Pod, { IPod } from "../models/Pod";
 import User from "../models/User";
 import Transaction from "../models/Transaction";
@@ -86,13 +87,13 @@ export async function triggerPayout(podId: string): Promise<IPod> {
   const netPayoutAmount = Math.max(0, payoutAmount - debtAmount);
 
   if (debtAmount > 0) {
-    console.info(
+    consola.info(
       `[payout] Debt deduction — ${recipient.name} missed ${debtAmount / pod.contributionAmount} prior cycle(s). ` +
         `Gross: ₦${payoutAmount.toLocaleString()}, debt: ₦${debtAmount.toLocaleString()}, net: ₦${netPayoutAmount.toLocaleString()}`,
     );
   }
 
-  console.info(
+  consola.info(
     `[payout] Initiating — pod: "${pod.name}" (${podId}), recipient: ${recipient.name}, ` +
       `gross: ₦${payoutAmount.toLocaleString()}, net: ₦${netPayoutAmount.toLocaleString()}`,
   );
@@ -103,7 +104,7 @@ export async function triggerPayout(podId: string): Promise<IPod> {
   try {
     walletBalance = await interswitch.getWalletBalance(pod.walletId);
   } catch (err) {
-    console.warn(
+    consola.warn(
       `[payout] Interswitch balance check failed, falling back to DB ledger:`,
       err,
     );
@@ -133,7 +134,7 @@ export async function triggerPayout(podId: string): Promise<IPod> {
       // transaction actually went through before reporting failure.
       if (!isTimeoutOrNetworkError(err)) throw err;
 
-      console.warn(
+      consola.warn(
         `[payout] disburseFunds threw a timeout/network error for ref ${reference} — re-querying status`,
       );
 
@@ -145,7 +146,7 @@ export async function triggerPayout(podId: string): Promise<IPod> {
           txStatus === "completed" ||
           txStatus === "approved"
         ) {
-          console.info(
+          consola.info(
             `[payout] Re-query confirms transaction ${reference} succeeded despite timeout`,
           );
           // Fall through to success path below
@@ -156,7 +157,7 @@ export async function triggerPayout(podId: string): Promise<IPod> {
         }
       } catch (reqErr) {
         // Re-query itself failed — report both errors so admin can investigate
-        console.error(
+        consola.error(
           `[payout] Re-query also failed for ref ${reference}:`,
           reqErr,
         );
@@ -167,11 +168,11 @@ export async function triggerPayout(podId: string): Promise<IPod> {
     }
     // Also debit the internal DB ledger to keep it in sync
     pod.contributionTotal -= netPayoutAmount;
-    console.info(
+    consola.info(
       `[payout] Disbursement successful — ₦${netPayoutAmount.toLocaleString()} → ${recipient.name} (${recipient.bankAccountNumber}), ref: ${reference}`,
     );
   } else {
-    console.info(
+    consola.info(
       `[payout] Net payout is ₦0 after debt deduction — disbursement skipped, queue advanced for ${recipient.name}`,
     );
   }
@@ -217,7 +218,7 @@ export async function triggerPayout(podId: string): Promise<IPod> {
     // Disbursement already succeeded — log the failure but don't re-throw.
     // A missing Transaction record is recoverable; re-throwing here would
     // misreport the payout as failed after money has already moved.
-    console.error(
+    consola.error(
       `[payout] WARNING: disbursement succeeded but Transaction record failed to save (ref: ${reference}):`,
       err,
     );

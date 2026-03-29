@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import jwt from "jsonwebtoken";
+import consola from "consola";
 import Pod from "../models/Pod";
 import User from "../models/User";
 import Transaction from "../models/Transaction";
@@ -39,7 +40,7 @@ router.get("/", async (req: Request, res: Response): Promise<void> => {
     const pods = await Pod.find({ status: "active" }).lean();
     res.json(pods);
   } catch (err) {
-    console.error("[pods/list]", err);
+    consola.error("[pods/list]", err);
     res.status(500).json({ error: "Failed to fetch pods" });
   }
 });
@@ -109,7 +110,7 @@ router.get("/:id", async (req, res: Response): Promise<void> => {
       nextRecipientMissedCycles,
     });
   } catch (err) {
-    console.error(`[pods/get] id=${req.params.id}`, err);
+    consola.error(`[pods/get] id=${req.params.id}`, err);
     res.status(500).json({ error: "Failed to fetch pod" });
   }
 });
@@ -147,7 +148,7 @@ router.get(
       try {
         balance = await getWalletBalance(pod.walletId);
       } catch (err) {
-        console.warn(
+        consola.warn(
           `[pods/wallet-balance] Interswitch fetch failed, falling back to ledger`,
           err,
         );
@@ -161,7 +162,7 @@ router.get(
         virtualAccount: pod.virtualAccount ?? null,
       });
     } catch (err) {
-      console.error(`[pods/wallet-balance] id=${req.params.id}`, err);
+      consola.error(`[pods/wallet-balance] id=${req.params.id}`, err);
       res.status(500).json({ error: "Failed to fetch wallet balance" });
     }
   },
@@ -199,7 +200,7 @@ router.get(
 
       res.json(contributions);
     } catch (err) {
-      console.error(`[pods/my-contributions] id=${req.params.id}`, err);
+      consola.error(`[pods/my-contributions] id=${req.params.id}`, err);
       res.status(500).json({ error: "Failed to fetch contributions" });
     }
   },
@@ -298,7 +299,7 @@ router.get(
 
       res.json(events);
     } catch (err) {
-      console.error(`[pods/activity] id=${req.params.id}`, err);
+      consola.error(`[pods/activity] id=${req.params.id}`, err);
       res.status(500).json({ error: "Failed to fetch activity" });
     }
   },
@@ -343,7 +344,7 @@ router.get(
 
       res.json(history);
     } catch (err) {
-      console.error(`[pods/payout-history] id=${req.params.id}`, err);
+      consola.error(`[pods/payout-history] id=${req.params.id}`, err);
       res.status(500).json({ error: "Failed to fetch payout history" });
     }
   },
@@ -383,7 +384,7 @@ router.get(
 
       res.json(latest);
     } catch (err) {
-      console.error(`[pods/trust-scores] id=${req.params.id}`, err);
+      consola.error(`[pods/trust-scores] id=${req.params.id}`, err);
       res.status(500).json({ error: "Failed to fetch trust scores" });
     }
   },
@@ -462,11 +463,11 @@ router.post(
         pod.walletId = walletId;
         if (virtualAccount) pod.virtualAccount = virtualAccount;
         await pod.save();
-        console.info(
+        consola.info(
           `[pods] Merchant wallet created for pod ${pod.id}: ${walletId}`,
         );
       } catch (err) {
-        console.warn(
+        consola.warn(
           `[pods] Wallet creation failed for pod ${pod.id} — continuing without wallet:`,
           (err as Error).message,
         );
@@ -474,7 +475,7 @@ router.post(
 
       res.status(201).json(pod);
     } catch (err) {
-      console.error("[pods/create]", err);
+      consola.error("[pods/create]", err);
       res.status(500).json({ error: "Failed to create pod" });
     }
   },
@@ -536,7 +537,7 @@ router.post(
 
       res.json({ message: "Wallet provisioned", walletId, virtualAccount });
     } catch (err) {
-      console.error(`[pods/provision-wallet] id=${req.params.id}`, err);
+      consola.error(`[pods/provision-wallet] id=${req.params.id}`, err);
       res.status(500).json({ error: "Failed to provision wallet" });
     }
   },
@@ -595,7 +596,7 @@ router.post(
       try {
         await Pod.findByIdAndUpdate(podId, { lastEvaluatedAt: new Date() });
       } catch (updateErr) {
-        console.warn(
+        consola.warn(
           `[pods/evaluate] Failed to update lastEvaluatedAt for pod ${podId}`,
           updateErr,
         );
@@ -604,7 +605,7 @@ router.post(
 
       res.json(result);
     } catch (err) {
-      console.error(`[pods/evaluate] id=${req.params.id}`, err);
+      consola.error(`[pods/evaluate] id=${req.params.id}`, err);
       res.status(500).json({ error: "AI evaluation failed" });
     }
   },
@@ -639,7 +640,7 @@ router.post(
       // VersionError means a concurrent payout already modified the pod —
       // safe to reject the duplicate rather than proceeding.
       if (err instanceof Error && err.name === "VersionError") {
-        console.warn(
+        consola.warn(
           `[POST /api/pods/${req.params.id}/payout] Concurrent payout blocked (VersionError)`,
         );
         res.status(409).json({
@@ -702,7 +703,7 @@ router.post(
         pod,
       });
     } catch (err) {
-      console.error(`[pods/reset] id=${req.params.id}`, err);
+      consola.error(`[pods/reset] id=${req.params.id}`, err);
       res.status(500).json({ error: "Failed to reset pod" });
     }
   },
@@ -797,7 +798,7 @@ router.get(
 
       res.json({ totalCycles, currentCycle: pod.currentCycle, members });
     } catch (err) {
-      console.error(`[pods/contribution-matrix] id=${req.params.id}`, err);
+      consola.error(`[pods/contribution-matrix] id=${req.params.id}`, err);
       res.status(500).json({ error: "Failed to fetch contribution matrix" });
     }
   },

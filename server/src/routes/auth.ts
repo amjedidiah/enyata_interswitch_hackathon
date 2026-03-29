@@ -2,6 +2,7 @@ import { Router, Request, Response, CookieOptions } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { validate as validateEmail } from "@purpleschool/deep-email-validator";
+import consola from "consola";
 import User from "../models/User";
 import { authenticate, AuthRequest } from "../middleware/auth";
 
@@ -144,7 +145,7 @@ router.post("/register", async (req: Request, res: Response): Promise<void> => {
       user: { id: user._id, name: user.name, email: user.email, phone: user.phone },
     });
   } catch (err) {
-    console.error("[auth/register]", err);
+    consola.error("[auth/register]", err);
     res.status(500).json({
       error: "Registration failed",
       message:
@@ -176,7 +177,7 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
       user: { id: user._id, name: user.name, email: user.email, phone: user.phone },
     });
   } catch (err) {
-    console.error("[auth/login]", err);
+    consola.error("[auth/login]", err);
     res.status(500).json({ error: "Login failed" });
   }
 });
@@ -241,7 +242,7 @@ router.get(
       }
       res.json({ user });
     } catch (err) {
-      console.error("[auth/me]", err);
+      consola.error("[auth/me]", err);
       res.status(500).json({ error: "Failed to fetch profile" });
     }
   },
@@ -292,7 +293,7 @@ router.patch(
 
       res.json({ user });
     } catch (err) {
-      console.error("[auth/me:patch]", err);
+      consola.error("[auth/me:patch]", err);
       res.status(500).json({ error: "Failed to update profile" });
     }
   },

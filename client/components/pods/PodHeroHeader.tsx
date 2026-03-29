@@ -1,7 +1,8 @@
-import { ArrowLeft, Calendar, Users } from "lucide-react";
+import { ArrowLeft, Calendar, Users, Clock } from "lucide-react";
 import Link from "next/link";
 import { HexPattern } from "@/components/home/HomeHero";
 import { frequencyLabel } from "@/lib/pod-constants";
+import { formatIsoDateTime, isIso8601DateTime } from "@/lib/iso";
 
 export interface Member {
   _id: string;
@@ -25,6 +26,10 @@ export interface Pod {
   createdBy: string;
   partialPayoutMemberIds?: string[];
   nextRecipientMissedCycles?: number[];
+  /**
+   * Timestamp of the last pod evaluation in ISO 8601 format.
+   * Example: "2026-04-03T12:34:56.789Z"
+   */
   lastEvaluatedAt?: string;
   virtualAccount?: {
     accountName: string;
@@ -37,6 +42,11 @@ function PodHeroHeader({
   pod,
   podsLink,
 }: Readonly<{ pod: Pod; podsLink: { text: string; href: string } }>) {
+  const safeLastEvaluatedAt =
+    pod.lastEvaluatedAt && isIso8601DateTime(pod.lastEvaluatedAt)
+      ? pod.lastEvaluatedAt
+      : undefined;
+
   return (
     <div className="relative bg-brand-primary text-brand-card overflow-hidden">
       <HexPattern />
@@ -79,6 +89,15 @@ function PodHeroHeader({
             <Users size={14} />
             {pod.members.length}/{pod.maxMembers} members
           </span>
+          {safeLastEvaluatedAt && (
+            <span
+              className="flex items-center gap-1.5"
+              title={safeLastEvaluatedAt}
+            >
+              <Clock size={14} />
+              Last evaluated {formatIsoDateTime(safeLastEvaluatedAt)}
+            </span>
+          )}
         </div>
       </div>
     </div>

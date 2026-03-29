@@ -7,6 +7,7 @@ import {
   cleanup,
 } from "@testing-library/react";
 import { AxiosError, AxiosResponse } from "axios";
+import consola from "consola";
 
 // ─── Mock externals ─────────────────────────────────────────────────────────
 
@@ -35,7 +36,7 @@ mock.module("@/contexts/AuthContext", () => ({
 
 const createSuccessRegisterMock = () =>
   mock((...args: unknown[]) => {
-    console.debug("registerMock", args);
+    consola.debug("registerMock", args);
     return Promise.resolve({
       data: {
         token: "jwt",

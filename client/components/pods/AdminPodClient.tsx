@@ -22,6 +22,7 @@ import { useAuthContext } from "@/contexts/AuthContext";
 import TaxShieldBanner from "./TaxShieldBanner";
 import { frequencyLabel } from "@/lib/pod-constants";
 import ContributionMatrix from "./ContributionMatrix";
+import { isIso8601DateTime } from "@/lib/iso";
 
 interface Member {
   _id: string;
@@ -47,6 +48,10 @@ export interface Pod {
   createdBy: string;
   partialPayoutMemberIds?: string[];
   nextRecipientMissedCycles?: number[];
+  /**
+   * Timestamp of the last pod evaluation in ISO 8601 format.
+   * Example: "2026-04-03T12:34:56.789Z"
+   */
   lastEvaluatedAt?: string;
 }
 
@@ -55,9 +60,16 @@ function axErrMsg(e: unknown): string {
   return ax.response?.data?.error ?? (e as Error).message;
 }
 
+function normalizePod(pod: Pod): Pod {
+  if (pod.lastEvaluatedAt && !isIso8601DateTime(pod.lastEvaluatedAt)) {
+    return { ...pod, lastEvaluatedAt: undefined };
+  }
+  return pod;
+}
+
 function AdminPodClient({ pod: initialPod }: Readonly<{ pod: Pod }>) {
   const { user } = useAuthContext();
-  const [pod, setPod] = useState(initialPod);
+  const [pod, setPod] = useState(() => normalizePod(initialPod));
   const queryClient = useQueryClient();
   const invalidateWallet = () =>
     queryClient.invalidateQueries({ queryKey: ["wallet-balance", pod._id] });
@@ -93,7 +105,7 @@ function AdminPodClient({ pod: initialPod }: Readonly<{ pod: Pod }>) {
     const interval = setInterval(async () => {
       try {
         const { data } = await api.get<Pod>(`/api/pods/${pod._id}`);
-        setPod(data);
+        setPod(normalizePod(data));
       } catch {
         // silently ignore — manual refresh is always available
       }
@@ -120,7 +132,7 @@ function AdminPodClient({ pod: initialPod }: Readonly<{ pod: Pod }>) {
    *  partialPayoutMemberIds and nextRecipientMissedCycles are included. */
   async function refreshPod() {
     const { data } = await api.get<Pod>(`/api/pods/${pod._id}`);
-    setPod(data);
+    setPod(normalizePod(data));
   }
 
   async function handleEvaluate() {
@@ -185,7 +197,7 @@ function AdminPodClient({ pod: initialPod }: Readonly<{ pod: Pod }>) {
         cycleNumber: Number(manualForm.cycleNumber),
       });
       const { data } = await api.get<Pod>(`/api/pods/${pod._id}`);
-      setPod(data);
+      setPod(normalizePod(data));
       if (data.walletId) invalidateWallet();
       setManualForm({ userId: "", cycleNumber: String(pod.currentCycle) });
       setMatrixRefreshKey((k) => k + 1);

@@ -2,12 +2,14 @@ import { Router, Request, Response } from "express";
 import { faker } from "@faker-js/faker";
 import bcrypt from "bcryptjs";
 import { Types } from "mongoose";
+import consola from "consola";
 import User from "../models/User";
 import Pod from "../models/Pod";
 import Transaction from "../models/Transaction";
 import TrustScore from "../models/TrustScore";
 
-const SEED_PASSWORD = process.env.SEED_PASSWORD ?? "password123";
+const FALLBACK_SEED_PASS = "password123";
+const SEED_PASSWORD = process.env.SEED_PASSWORD ?? FALLBACK_SEED_PASS;
 const CONTRIBUTION_AMOUNT = 5000;
 const MAX_MEMBERS = 4;
 const CYCLE_GOAL = CONTRIBUTION_AMOUNT * MAX_MEMBERS; // ₦20,000 per payout
@@ -292,7 +294,7 @@ router.post("/", async (_req: Request, res: Response): Promise<void> => {
       },
     });
   } catch (err) {
-    console.error("[seed]", err);
+    consola.error("[seed]", err);
     res.status(500).json({ error: "Seed failed", detail: String(err) });
   }
 });

@@ -6,6 +6,7 @@ import { podsApi } from "@/lib/api";
 import TrustScoreCard from "@/components/pods/TrustScoreCard";
 import { AnimatePresence } from "framer-motion";
 import Motion from "@/components/shared/Motion";
+import { isIso8601DateTime } from "@/lib/iso";
 
 interface Member {
   _id: string;
@@ -31,6 +32,7 @@ interface PodPayoutQueueProps {
 }
 
 function timeAgo(dateStr: string): string {
+  if (!isIso8601DateTime(dateStr)) return "unknown";
   const date = new Date(dateStr);
   if (Number.isNaN(date.getTime())) return "unknown";
   const diff = Date.now() - date.getTime();
@@ -54,6 +56,11 @@ function PodPayoutQueue({
   refreshKey = 0,
   lastEvaluatedAt,
 }: Readonly<PodPayoutQueueProps>) {
+  const safeLastEvaluatedAt =
+    lastEvaluatedAt && isIso8601DateTime(lastEvaluatedAt)
+      ? lastEvaluatedAt
+      : undefined;
+
   const [trustScores, setTrustScores] = useState<
     Record<string, TrustScoreData>
   >({});
@@ -85,9 +92,9 @@ function PodPayoutQueue({
           </span>
         </div>
       </div>
-      {lastEvaluatedAt && (
+      {safeLastEvaluatedAt && (
         <p className="text-[11px] text-brand-muted mb-3 -mt-2">
-          Queue ranked by AI · updated {timeAgo(lastEvaluatedAt)}
+          Queue ranked by AI · updated {timeAgo(safeLastEvaluatedAt)}
         </p>
       )}
 

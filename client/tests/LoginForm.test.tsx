@@ -6,6 +6,7 @@ import {
   waitFor,
   cleanup,
 } from "@testing-library/react";
+import consola from "consola";
 
 // ─── Mock externals before importing the component ──────────────────────────
 
@@ -34,7 +35,7 @@ mock.module("@/contexts/AuthContext", () => ({
 
 const createSuccessLoginMock = () =>
   mock((...args: unknown[]) => {
-    console.debug("loginMock", args);
+    consola.debug("loginMock", args);
     return Promise.resolve({
       data: { token: "jwt", user: { id: "1", name: "Test", email: "t@t.com" } },
     });

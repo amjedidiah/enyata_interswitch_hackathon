@@ -1,5 +1,6 @@
 import { Router, Response } from "express";
 import mongoose from "mongoose";
+import consola from "consola";
 import Pod from "../models/Pod";
 import Transaction from "../models/Transaction";
 import TrustScore from "../models/TrustScore";
@@ -34,7 +35,7 @@ router.get("/", async (_req, res: Response): Promise<void> => {
       totalPayouts,
     });
   } catch (err) {
-    console.error("[stats/platform]", err);
+    consola.error("[stats/platform]", err);
     res.status(500).json({ error: "Failed to fetch platform stats" });
   }
 });
@@ -153,7 +154,7 @@ router.get(
       upcomingPayments,
     });
     } catch (err) {
-      console.error(`[stats/me] user=${userId}`, err);
+      consola.error(`[stats/me] user=${userId}`, err);
       res.status(500).json({ error: "Failed to fetch user stats" });
     }
   },

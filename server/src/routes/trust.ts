@@ -1,4 +1,5 @@
 import { Router, Response } from "express";
+import consola from "consola";
 import { scoreTrust, CycleDetail } from "../services/trustAgent";
 import { authenticate, AuthRequest } from "../middleware/auth";
 
@@ -33,15 +34,22 @@ router.post(
       return;
     }
 
-    // Build a synthetic cycle history from flat counts for testing.
-    const cycleHistory: CycleDetail[] = [];
-    let cycle = 1;
-    for (let i = 0; i < Number(onTimePayments); i++)
-      cycleHistory.push({ cycle: cycle++, outcome: "on_time" });
-    for (let i = 0; i < Number(latePayments); i++)
-      cycleHistory.push({ cycle: cycle++, outcome: "late" });
-    for (let i = 0; i < Number(missedPayments); i++)
-      cycleHistory.push({ cycle: cycle++, outcome: "missed" });
+    // Build a synthetic cycle history by interleaving outcomes chronologically.
+    // Shuffled so the AI sees a realistic mix rather than grouped blocks
+    // (e.g. all on_time first) which would bias trend detection.
+    const outcomes: CycleDetail["outcome"][] = [
+      ...new Array(Number(onTimePayments)).fill("on_time"),
+      ...new Array(Number(latePayments)).fill("late"),
+      ...new Array(Number(missedPayments)).fill("missed"),
+    ];
+    for (let i = outcomes.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [outcomes[i], outcomes[j]] = [outcomes[j], outcomes[i]];
+    }
+    const cycleHistory: CycleDetail[] = outcomes.map((outcome, i) => ({
+      cycle: i + 1,
+      outcome,
+    }));
 
     try {
       const result = await scoreTrust({
@@ -53,7 +61,7 @@ router.post(
       });
       res.json(result);
     } catch (err) {
-      console.error("[trust/score] AI call failed:", err);
+      consola.error("[trust/score] AI call failed:", err);
       res
         .status(502)
         .json({ error: "AI scoring service unavailable", detail: String(err) });

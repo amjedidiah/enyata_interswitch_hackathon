@@ -1,4 +1,5 @@
 import { Router, Response } from "express";
+import consola from "consola";
 import { authenticate, AuthRequest } from "../middleware/auth";
 import Pod from "../models/Pod";
 import Transaction from "../models/Transaction";
@@ -73,7 +74,7 @@ router.post(
         contributionAmount: pod.contributionAmount,
       });
 
-      console.info(
+      consola.info(
         `[payments/join] user=${userId} pod=${podId} cycles=${result.cycles} total=₦${result.totalAmount}`,
       );
 
@@ -88,7 +89,7 @@ router.post(
         res.status(statusCode).json({ error: (err as Error).message });
         return;
       }
-      console.error("[payments/join]", err);
+      consola.error("[payments/join]", err);
       res.status(500).json({ error: "Failed to join pod" });
     }
   },
@@ -150,7 +151,7 @@ router.post(
         contributionAmount: pod.contributionAmount,
       });
 
-      console.info(
+      consola.info(
         `[payments/contribute] user=${userId} pod=${podId} cycles=${result.cycles} total=₦${result.totalAmount}`,
       );
 
@@ -166,7 +167,7 @@ router.post(
         res.status(statusCode).json({ error: (err as Error).message });
         return;
       }
-      console.error("[payments/contribute]", err);
+      consola.error("[payments/contribute]", err);
       res.status(500).json({ error: "Failed to record contribution" });
     }
   },
@@ -254,7 +255,7 @@ router.post(
 
       await creditWallet(podId, amount);
 
-      console.info(
+      consola.info(
         `[payments/manual] admin=${req.user!.id} user=${userId} pod=${podId} cycle=${targetCycle} amount=₦${amount}`,
       );
 
@@ -263,7 +264,7 @@ router.post(
         transaction,
       });
     } catch (err) {
-      console.error("[payments/manual]", err);
+      consola.error("[payments/manual]", err);
       res.status(500).json({ error: "Failed to record manual payment" });
     }
   },

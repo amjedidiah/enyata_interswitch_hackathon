@@ -56,12 +56,12 @@ function get(path: string, token?: string) {
   });
 }
 
-function patch(path: string, body: object, token: string) {
+function patch(path: string, body: object, token?: string) {
   return fetch(`${baseUrl}${path}`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify(body),
   });
@@ -289,6 +289,14 @@ describe("PATCH /auth/me", () => {
     };
     expect(data.user.bankAccountNumber).toBe("0123456789");
     expect(data.user.bankCode).toBe("057");
+  });
+
+  it("rejects unauthenticated requests", async () => {
+    const res = await patch("/auth/me", {
+      bankAccountNumber: "0123456789",
+      bankCode: "057",
+    });
+    expect(res.status).toBe(401);
   });
 
   it("rejects non-10-digit account number", async () => {

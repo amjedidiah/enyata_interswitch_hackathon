@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { podsApi } from "@/lib/api";
 import WalletBalanceWidget from "./WalletBalanceWidget";
+import consola from "consola";
 
 /**
  * Thin client wrapper around WalletBalanceWidget that adds wallet provisioning
@@ -30,7 +31,7 @@ function MemberWalletSection({
       toast.success("Wallet provisioned.");
     } catch (error) {
       toast.error("Failed to provision wallet.");
-      console.error(error);
+      consola.error(error);
     } finally {
       setProvisionLoading(false);
     }

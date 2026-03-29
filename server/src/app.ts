@@ -1,5 +1,6 @@
 import express, { NextFunction, Request, Response } from "express";
 import cors from "cors";
+import consola from "consola";
 
 import authRoutes from "./routes/auth";
 import seedRoutes from "./routes/seed";
@@ -31,9 +32,9 @@ export function createApp() {
     res.on("finish", () => {
       const ms = Date.now() - start;
       const line = `[${req.method}] ${req.originalUrl} -> ${res.statusCode} ${res.statusMessage ?? ""} (${ms}ms)`;
-      if (res.statusCode >= 500) console.error(line);
-      else if (res.statusCode >= 400) console.warn(line);
-      else console.info(line);
+      if (res.statusCode >= 500) consola.error(line);
+      else if (res.statusCode >= 400) consola.warn(line);
+      else consola.info(line);
     });
     next();
   });
@@ -70,10 +71,10 @@ export function createApp() {
 
   // Global error handler
   app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
-    console.error(
+    consola.error(
       `[${req.method} ${req.originalUrl}] Unhandled error: ${err.message}`,
     );
-    if (process.env.NODE_ENV !== "production") console.error(err.stack);
+    if (process.env.NODE_ENV !== "production") consola.error(err.stack);
     res.status(500).json({ error: err.message || "Internal server error" });
   });
 

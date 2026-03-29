@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import consola from "consola";
 import { runCycleDeadlineEvaluations } from "../services/cronJobs";
 
 const router = Router();
@@ -25,7 +26,7 @@ router.post(
         ...result,
       });
     } catch (err) {
-      console.error("[cron/run-evaluations]", err);
+      consola.error("[cron/run-evaluations]", err);
       res.status(500).json({ error: "Evaluation run failed" });
     }
   },

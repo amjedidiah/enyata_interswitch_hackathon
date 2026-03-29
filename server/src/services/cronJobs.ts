@@ -1,4 +1,6 @@
 import cron from "node-cron";
+import pLimit from "p-limit";
+import consola from "consola";
 import Pod from "../models/Pod";
 import { evaluateAndReorderQueue, cycleDueDate } from "./queueService";
 
@@ -18,23 +20,23 @@ let isRunning = false;
 export function startCronJobs() {
   cron.schedule("0 * * * *", async () => {
     if (isRunning) {
-      console.warn("[cron] Previous evaluation still running, skipping this tick");
+      consola.warn("[cron] Previous evaluation still running, skipping this tick");
       return;
     }
 
     isRunning = true;
-    console.info("[cron] Running cycle-deadline evaluation check…");
+    consola.info("[cron] Running cycle-deadline evaluation check…");
     
     try {
       await runCycleDeadlineEvaluations();
     } catch (err) {
-      console.error("[cron] Unhandled error in cycle-deadline evaluations:", err);
+      consola.error("[cron] Unhandled error in cycle-deadline evaluations:", err);
     } finally {
       isRunning = false;
     }
   });
 
-  console.info("[cron] Scheduled: cycle-deadline evaluations (every hour)");
+  consola.info("[cron] Scheduled: cycle-deadline evaluations (every hour)");
 }
 
 /**
@@ -53,53 +55,83 @@ export async function runCycleDeadlineEvaluations(): Promise<{
 
   const activePods = await Pod.find({ status: "active" });
 
-  for (const pod of activePods) {
-    try {
-      // Compute the deadline for the current cycle
-      const deadline = cycleDueDate(
-        pod.frequency,
-        pod.createdAt,
-        pod.currentCycle,
-      );
+  // Allow controlled parallelism across pods to improve scalability.
+  const concurrency = Math.min(
+    8,
+    Math.max(1, Number(process.env.POD_EVAL_CONCURRENCY ?? 4)),
+  );
+  const limit = pLimit(concurrency);
 
-      // Only evaluate if the deadline has passed
-      if (now <= deadline) {
-        skipped.push(`${pod.name} — deadline not yet passed`);
-        continue;
-      }
+  type Result =
+    | { kind: "evaluated"; name: string }
+    | { kind: "skipped"; reason: string }
+    | { kind: "error"; reason: string };
 
-      // Skip if already evaluated after this deadline
-      if (pod.lastEvaluatedAt && pod.lastEvaluatedAt > deadline) {
-        skipped.push(`${pod.name} — already evaluated this cycle`);
-        continue;
-      }
+  const results = await Promise.all(
+    activePods.map((pod) =>
+      limit(async () => {
+        try {
+          // Compute the deadline for the current cycle
+          const deadline = cycleDueDate(
+            pod.frequency,
+            pod.createdAt,
+            pod.currentCycle,
+          );
 
-      // Skip if queue is empty (all paid out)
-      if (pod.payoutQueue.length === 0) {
-        skipped.push(`${pod.name} — queue empty`);
-        continue;
-      }
+          // Only evaluate if the deadline has passed
+          if (now <= deadline) {
+            return {
+              kind: "skipped",
+              reason: `${pod.name} — deadline not yet passed`,
+            } as const;
+          }
 
-      console.info(
-        `[cron] Evaluating pod "${pod.name}" (${pod._id}) — cycle ${pod.currentCycle} deadline passed`,
-      );
+          // Skip if already evaluated after this deadline
+          if (pod.lastEvaluatedAt && pod.lastEvaluatedAt > deadline) {
+            return {
+              kind: "skipped",
+              reason: `${pod.name} — already evaluated this cycle`,
+            } as const;
+          }
 
-      await evaluateAndReorderQueue(pod._id.toString());
+          // Skip if queue is empty (all paid out)
+          if (pod.payoutQueue.length === 0) {
+            return {
+              kind: "skipped",
+              reason: `${pod.name} — queue empty`,
+            } as const;
+          }
 
-      // Mark the pod as evaluated
-      pod.lastEvaluatedAt = now;
-      await Pod.findByIdAndUpdate(pod._id, { lastEvaluatedAt: now });
+          consola.info(
+            `[cron] Evaluating pod "${pod.name}" (${pod._id}) — cycle ${pod.currentCycle} deadline passed`,
+          );
 
+          await evaluateAndReorderQueue(pod._id.toString());
 
-      evaluated.push(pod.name);
-    } catch (err) {
-      const msg = `${pod.name}: ${(err as Error).message}`;
-      console.error(`[cron] Evaluation failed for pod "${pod.name}":`, err);
-      errors.push(msg);
-    }
+          // Mark the pod as evaluated
+          pod.lastEvaluatedAt = now;
+          await Pod.findByIdAndUpdate(pod._id, { lastEvaluatedAt: now });
+
+          return { kind: "evaluated", name: pod.name } as const;
+        } catch (err) {
+          const msg = `${pod.name}: ${(err as Error).message}`;
+          consola.error(
+            `[cron] Evaluation failed for pod "${pod.name}":`,
+            err,
+          );
+          return { kind: "error", reason: msg } as const;
+        }
+      }),
+    ),
+  );
+
+  for (const r of results) {
+    if (r.kind === "evaluated") evaluated.push(r.name);
+    if (r.kind === "skipped") skipped.push(r.reason);
+    if (r.kind === "error") errors.push(r.reason);
   }
 
-  console.info(
+  consola.info(
     `[cron] Cycle-deadline evaluation complete — evaluated: ${evaluated.length}, skipped: ${skipped.length}, errors: ${errors.length}`,
   );
 

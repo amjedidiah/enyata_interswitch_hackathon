@@ -1,3 +1,4 @@
+import consola from "consola";
 import Pod from "../models/Pod";
 import { creditWalletViaCallback } from "./interswitch";
 
@@ -39,7 +40,10 @@ export async function creditWallet(
       );
       return ref;
     } catch (err) {
-      console.error(`[wallet] Interswitch callback failed for pod ${podId}:`, err);
+      consola.error(
+        `[wallet] Interswitch callback failed for pod ${podId}:`,
+        err,
+      );
     }
   }
   return undefined;
